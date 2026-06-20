@@ -33,11 +33,11 @@ export function useSettings() {
     }
   }, []);
 
-  const saveSettings = async (field: string, val: string | boolean) => {
-    setSettings(prev => ({ ...prev, [field]: val }));
+  const saveSettings = async (newSettings: WorkspaceSettings) => {
     try {
-      await api.put('/settings', { [field]: val });
-      toastSuccess('Settings saved!');
+      await api.put('/settings', newSettings);
+      setSettings(newSettings);
+      toastSuccess('Settings saved successfully!');
       return { ok: true };
     } catch (e: any) {
       toastError(e.message || 'Failed to save settings');

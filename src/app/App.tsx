@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import type {
   Permission,
   Task,
+  WorkspaceSettings,
 } from '../types';
 
 // Lib
@@ -438,8 +439,8 @@ export default function App() {
     }));
   };
 
-  const handleSaveSettings = async (field: string, val: string | boolean) => {
-    await saveSettings(field, val);
+  const handleSaveSettings = async (newSettings: WorkspaceSettings) => {
+    await saveSettings(newSettings);
   };
 
   // ─── Derived Data ───

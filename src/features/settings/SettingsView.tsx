@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { WorkspaceSettings } from '../../types';
 
 interface SettingsViewProps {
   settings: WorkspaceSettings;
-  onSave: (field: string, val: string | boolean) => void;
+  onSave: (settings: WorkspaceSettings) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
+  const [localSettings, setLocalSettings] = useState<WorkspaceSettings>({ ...settings });
+
+  // Update local settings if global settings change (e.g. initial load)
+  useEffect(() => {
+    setLocalSettings({ ...settings });
+  }, [settings]);
+
+  const handleChange = (field: keyof WorkspaceSettings, val: any) => {
+    setLocalSettings(prev => ({ ...prev, [field]: val }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(localSettings);
+  };
+
   return (
     <div style={{ maxWidth: '640px' }}>
-      <div
+      <form
+        onSubmit={handleSubmit}
         style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '16px', padding: '28px' }}
       >
         <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '22px' }}>Workspace customization</div>
@@ -18,8 +35,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
         <div style={{ marginBottom: '22px' }}>
           <label style={{ fontSize: '13px', fontWeight: 700, color: '#44444e' }}>Company name</label>
           <input
-            value={settings.companyName}
-            onChange={e => onSave('companyName', e.target.value)}
+            value={localSettings.companyName}
+            onChange={e => handleChange('companyName', e.target.value)}
             style={{
               width: '100%',
               marginTop: '7px',
@@ -28,24 +45,26 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
               borderRadius: '10px',
               fontSize: '14px',
             }}
+            required
           />
         </div>
 
         {/* Accent Color */}
         <div style={{ marginBottom: '22px' }}>
-          <label style={{ fontSize: '13px', fontWeight: 700, color: '#44444e' }}>Accent color</label>
+          <label style={{ fontSize: '13px', fontWeight: 700, color: '#44444e' }}>Accent color (Selected: {localSettings.accent})</label>
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
             {['#4f46e5', '#2563eb', '#0d9488', '#7c3aed', '#db2777'].map(c => (
               <button
+                type="button"
                 key={c}
-                onClick={() => onSave('accent', c)}
+                onClick={() => handleChange('accent', c)}
                 style={{
                   width: '32px',
                   height: '32px',
                   borderRadius: '8px',
                   background: c,
                   cursor: 'pointer',
-                  border: `3px solid ${settings.accent === c ? '#16161a' : 'transparent'}`,
+                  border: `3px solid ${localSettings.accent === c ? '#16161a' : 'transparent'}`,
                 }}
               />
             ))}
@@ -57,37 +76,39 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
           <label style={{ fontSize: '13px', fontWeight: 700, color: '#44444e' }}>Sidebar theme</label>
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
             <button
-              onClick={() => onSave('sidebarTheme', 'light')}
+              type="button"
+              onClick={() => handleChange('sidebarTheme', 'light')}
               style={{
                 padding: '11px 22px',
                 borderRadius: '10px',
                 fontWeight: 700,
                 fontSize: '13px',
                 cursor: 'pointer',
-                border: `1px solid ${settings.sidebarTheme === 'light' ? settings.accent : '#e1e1e8'}`,
+                border: `1px solid ${localSettings.sidebarTheme === 'light' ? localSettings.accent : '#e1e1e8'}`,
                 background:
-                  settings.sidebarTheme === 'light'
-                    ? `color-mix(in srgb, ${settings.accent} 8%, #fff)`
+                  localSettings.sidebarTheme === 'light'
+                    ? `color-mix(in srgb, ${localSettings.accent} 8%, #fff)`
                     : '#fff',
-                color: settings.sidebarTheme === 'light' ? settings.accent : '#6b6b76',
+                color: localSettings.sidebarTheme === 'light' ? localSettings.accent : '#6b6b76',
               }}
             >
               Light
             </button>
             <button
-              onClick={() => onSave('sidebarTheme', 'dark')}
+              type="button"
+              onClick={() => handleChange('sidebarTheme', 'dark')}
               style={{
                 padding: '11px 22px',
                 borderRadius: '10px',
                 fontWeight: 700,
                 fontSize: '13px',
                 cursor: 'pointer',
-                border: `1px solid ${settings.sidebarTheme === 'dark' ? settings.accent : '#e1e1e8'}`,
+                border: `1px solid ${localSettings.sidebarTheme === 'dark' ? localSettings.accent : '#e1e1e8'}`,
                 background:
-                  settings.sidebarTheme === 'dark'
-                    ? `color-mix(in srgb, ${settings.accent} 8%, #fff)`
+                  localSettings.sidebarTheme === 'dark'
+                    ? `color-mix(in srgb, ${localSettings.accent} 8%, #fff)`
                     : '#fff',
-                color: settings.sidebarTheme === 'dark' ? settings.accent : '#6b6b76',
+                color: localSettings.sidebarTheme === 'dark' ? localSettings.accent : '#6b6b76',
               }}
             >
               Dark
@@ -103,9 +124,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
             <input
               type="checkbox"
               id="emailEnabled"
-              checked={!!settings.emailEnabled}
-              onChange={e => onSave('emailEnabled', e.target.checked)}
-              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: settings.accent }}
+              checked={!!localSettings.emailEnabled}
+              onChange={e => handleChange('emailEnabled', e.target.checked)}
+              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: localSettings.accent }}
             />
             <label
               htmlFor="emailEnabled"
@@ -115,13 +136,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
             </label>
           </div>
 
-          {settings.emailEnabled && (
+          {localSettings.emailEnabled && (
             <>
               <div style={{ marginBottom: '18px' }}>
                 <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Host</label>
                 <input
-                  value={settings.smtpHost || ''}
-                  onChange={e => onSave('smtpHost', e.target.value)}
+                  value={localSettings.smtpHost || ''}
+                  onChange={e => handleChange('smtpHost', e.target.value)}
                   placeholder="e.g. smtp.gmail.com"
                   style={{
                     width: '100%',
@@ -131,6 +152,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                     borderRadius: '10px',
                     fontSize: '13.5px',
                   }}
+                  required={localSettings.emailEnabled}
                 />
               </div>
 
@@ -140,8 +162,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                 <div>
                   <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Port</label>
                   <input
-                    value={settings.smtpPort || ''}
-                    onChange={e => onSave('smtpPort', e.target.value)}
+                    value={localSettings.smtpPort || ''}
+                    onChange={e => handleChange('smtpPort', e.target.value)}
                     placeholder="e.g. 587"
                     style={{
                       width: '100%',
@@ -151,6 +173,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                       borderRadius: '10px',
                       fontSize: '13.5px',
                     }}
+                    required={localSettings.emailEnabled}
                   />
                 </div>
                 <div>
@@ -158,8 +181,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                     Sender Email (From)
                   </label>
                   <input
-                    value={settings.smtpFrom || ''}
-                    onChange={e => onSave('smtpFrom', e.target.value)}
+                    value={localSettings.smtpFrom || ''}
+                    onChange={e => handleChange('smtpFrom', e.target.value)}
                     placeholder="e.g. noreply@morango.ai"
                     style={{
                       width: '100%',
@@ -169,6 +192,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                       borderRadius: '10px',
                       fontSize: '13.5px',
                     }}
+                    required={localSettings.emailEnabled}
                   />
                 </div>
               </div>
@@ -178,8 +202,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                   SMTP User (Username)
                 </label>
                 <input
-                  value={settings.smtpUser || ''}
-                  onChange={e => onSave('smtpUser', e.target.value)}
+                  value={localSettings.smtpUser || ''}
+                  onChange={e => handleChange('smtpUser', e.target.value)}
                   placeholder="e.g. user@gmail.com"
                   style={{
                     width: '100%',
@@ -189,6 +213,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                     borderRadius: '10px',
                     fontSize: '13.5px',
                   }}
+                  required={localSettings.emailEnabled}
                 />
               </div>
 
@@ -196,8 +221,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                 <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Password</label>
                 <input
                   type="password"
-                  value={settings.smtpPassword || ''}
-                  onChange={e => onSave('smtpPassword', e.target.value)}
+                  value={localSettings.smtpPassword || ''}
+                  onChange={e => handleChange('smtpPassword', e.target.value)}
                   placeholder="••••••••"
                   style={{
                     width: '100%',
@@ -207,12 +232,42 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
                     borderRadius: '10px',
                     fontSize: '13.5px',
                   }}
+                  required={localSettings.emailEnabled}
                 />
               </div>
             </>
           )}
         </div>
-      </div>
+
+        {/* Save Settings Submit Button */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'flex-end',
+            borderTop: '1px solid #f2f2f5',
+            paddingTop: '20px',
+            marginTop: '28px',
+          }}
+        >
+          <button
+            type="submit"
+            style={{
+              padding: '11px 24px',
+              border: 'none',
+              borderRadius: '10px',
+              background: localSettings.accent,
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '13.5px',
+              cursor: 'pointer',
+              transition: 'background 0.2s ease',
+            }}
+          >
+            Save Settings
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
