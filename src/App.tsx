@@ -26,7 +26,14 @@ interface User {
   role: string;
   title: string;
   color: string;
-  perms?: Permission;
+  perms?: {
+    permAllTasks: boolean;
+    permCreate: boolean;
+    permTeam: boolean;
+    permRoles: boolean;
+    permReports: boolean;
+    permSettings: boolean;
+  };
 }
 
 interface Comment {
@@ -56,6 +63,12 @@ interface WorkspaceSettings {
   companyName: string;
   accent: string;
   sidebarTheme: 'light' | 'dark';
+  smtpHost?: string;
+  smtpPort?: string;
+  smtpUser?: string;
+  smtpPassword?: string;
+  smtpFrom?: string;
+  emailEnabled?: boolean;
 }
 
 interface AppNotification {
@@ -72,11 +85,16 @@ export default function App() {
   // Authentication & Layout states
   const [token, setToken] = useState<string | null>(localStorage.getItem('morango_token'));
   const [user, setUser] = useState<User | null>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
   const [settings, setSettings] = useState<WorkspaceSettings>({
     companyName: 'Morango AI',
     accent: '#4f46e5',
-    sidebarTheme: 'light'
+    sidebarTheme: 'light',
+    smtpHost: '',
+    smtpPort: '',
+    smtpUser: '',
+    smtpPassword: '',
+    smtpFrom: '',
+    emailEnabled: false
   });
 
   // Navigation and views
@@ -134,7 +152,6 @@ export default function App() {
   // 1. Initial configuration fetch
   useEffect(() => {
     fetchSettings();
-    fetchAccounts();
   }, []);
 
   // 2. Fetch authenticated profile & lists when token is set
@@ -162,16 +179,6 @@ export default function App() {
     }
   };
 
-  const fetchAccounts = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/accounts`);
-      const data = await res.json();
-      if (res.ok) setAccounts(data);
-    } catch (e) {
-      console.error('Error fetching accounts:', e);
-    }
-  };
-
   const fetchProfile = async () => {
     setLoading(true);
     try {
@@ -182,7 +189,7 @@ export default function App() {
       if (res.ok) {
         setUser(data);
         const perms = data.perms || {};
-        setView(perms.permAllTasks ? 'dashboard' : 'mytasks');
+        setView(perms.allTasks ? 'dashboard' : 'mytasks');
         // Fetch private tables
         fetchTasks();
         fetchMembers();
@@ -278,25 +285,6 @@ export default function App() {
         setToken(data.token);
       } else {
         setLoginError(data.error || 'Authentication failed');
-      }
-    } catch (err) {
-      setLoginError('Failed to connect to the server');
-    }
-  };
-
-  const handleQuickLogin = async (accountEmail: string) => {
-    setLoginError(null);
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: accountEmail, password: 'demo1234' })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setToken(data.token);
-      } else {
-        setLoginError(data.error || 'Quick login failed');
       }
     } catch (err) {
       setLoginError('Failed to connect to the server');
@@ -508,7 +496,7 @@ export default function App() {
   };
 
   // Settings Operations
-  const handleSaveSettings = async (field: string, val: string) => {
+  const handleSaveSettings = async (field: string, val: string | boolean) => {
     const updated = { ...settings, [field]: val };
     setSettings(updated);
 
@@ -533,11 +521,6 @@ export default function App() {
 
   const getUserById = (id: string) => {
     return members.find(m => m.id === id);
-  };
-
-  const getRoleColor = (roleId: string) => {
-    const r = roles.find(rl => rl.id === roleId);
-    return r ? r.color : '#64748b';
   };
 
   const formatDate = (iso: string) => {
@@ -585,7 +568,8 @@ export default function App() {
       onClick: () => setView(key),
       bg: view === key ? 'var(--side-active,#eef1ff)' : 'transparent',
       fg: view === key ? 'var(--accent,#4f46e5)' : 'var(--side-muted,#6b6b76)',
-      dot: view === key ? 'var(--accent,#4f46e5)' : 'transparent'
+      dot: view === key ? 'var(--accent,#4f46e5)' : 'transparent',
+      countBg: view === key ? `color-mix(in srgb, ${settings.accent} 18%, #fff)` : 'rgba(127,127,140,.14)'
     });
 
     if (perms.permAllTasks) {
@@ -872,7 +856,7 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                     {stats.map(st => (
                       <div key={st.label} style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '18px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifySpace: 'between', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ fontSize: '12.5px', color: '#8a8a94', fontWeight: 600 }}>{st.label}</div>
                           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.color }}></div>
                         </div>
@@ -1063,7 +1047,7 @@ export default function App() {
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: '18px' }}>
                     <div style={{ fontSize: '13.5px', color: '#8a8a94', fontWeight: 600 }}>{roles.length} Roles available</div>
-                    {user.perms?.roles && (
+                    {user.perms?.permRoles && (
                       <button onClick={() => setAddingRole(true)} style={{ marginLeft: 'auto', padding: '9px 16px', border: 'none', borderRadius: '9px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>+ Add role</button>
                     )}
                   </div>
@@ -1250,15 +1234,52 @@ export default function App() {
                           <button key={c} onClick={() => handleSaveSettings('accent', c)} style={{ width: '32px', height: '32px', borderRadius: '8px', background: c, cursor: 'pointer', border: `3px solid ${settings.accent === c ? '#16161a' : 'transparent'}` }}></button>
                         ))}
                       </div>
-                    </div>
-
-                    <div>
+                       <div style={{ marginBottom: '22px' }}>
                       <label style={{ fontSize: '13px', fontWeight: 700, color: '#44444e' }}>Sidebar theme</label>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                         <button onClick={() => handleSaveSettings('sidebarTheme', 'light')} style={{ padding: '11px 22px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: `1px solid ${settings.sidebarTheme === 'light' ? settings.accent : '#e1e1e8'}`, background: settings.sidebarTheme === 'light' ? `color-mix(in srgb, ${settings.accent} 8%, #fff)` : '#fff', color: settings.sidebarTheme === 'light' ? settings.accent : '#6b6b76' }}>Light</button>
                         <button onClick={() => handleSaveSettings('sidebarTheme', 'dark')} style={{ padding: '11px 22px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: `1px solid ${settings.sidebarTheme === 'dark' ? settings.accent : '#e1e1e8'}`, background: settings.sidebarTheme === 'dark' ? `color-mix(in srgb, ${settings.accent} 8%, #fff)` : '#fff', color: settings.sidebarTheme === 'dark' ? settings.accent : '#6b6b76' }}>Dark</button>
                       </div>
                     </div>
+
+                    <div style={{ marginTop: '28px', borderTop: '1px solid #ececf1', paddingTop: '22px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '18px' }}>Email Setup (SMTP)</div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <input type="checkbox" id="emailEnabled" checked={!!settings.emailEnabled} onChange={e => handleSaveSettings('emailEnabled', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: settings.accent }} />
+                        <label htmlFor="emailEnabled" style={{ fontSize: '13px', fontWeight: 700, color: '#44444e', cursor: 'pointer' }}>Enable Email Notifications</label>
+                      </div>
+
+                      {settings.emailEnabled && (
+                        <>
+                          <div style={{ marginBottom: '18px' }}>
+                            <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Host</label>
+                            <input value={settings.smtpHost || ''} onChange={e => handleSaveSettings('smtpHost', e.target.value)} placeholder="e.g. smtp.gmail.com" style={{ width: '100%', marginTop: '6px', padding: '10px 12px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '13.5px' }} />
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
+                            <div>
+                              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Port</label>
+                              <input value={settings.smtpPort || ''} onChange={e => handleSaveSettings('smtpPort', e.target.value)} placeholder="e.g. 587" style={{ width: '100%', marginTop: '6px', padding: '10px 12px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '13.5px' }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>Sender Email (From)</label>
+                              <input value={settings.smtpFrom || ''} onChange={e => handleSaveSettings('smtpFrom', e.target.value)} placeholder="e.g. noreply@morango.ai" style={{ width: '100%', marginTop: '6px', padding: '10px 12px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '13.5px' }} />
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: '18px' }}>
+                            <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP User (Username)</label>
+                            <input value={settings.smtpUser || ''} onChange={e => handleSaveSettings('smtpUser', e.target.value)} placeholder="e.g. user@gmail.com" style={{ width: '100%', marginTop: '6px', padding: '10px 12px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '13.5px' }} />
+                          </div>
+
+                          <div style={{ marginBottom: '8px' }}>
+                            <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#6b6b76' }}>SMTP Password</label>
+                            <input type="password" value={settings.smtpPassword || ''} onChange={e => handleSaveSettings('smtpPassword', e.target.value)} placeholder="••••••••" style={{ width: '100%', marginTop: '6px', padding: '10px 12px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '13.5px' }} />
+                          </div>
+                        </>
+                      )}
+                    </div>                   </div>
                   </div>
                 </div>
               )}
@@ -1270,29 +1291,35 @@ export default function App() {
 
       {/* ============ TICKET DETAIL MODAL ============ */}
       {selectedTask && detail && (
-        <div onClick={() => setSelectedId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', zIndex: 50, animation: 'tf-overlay .15s ease' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', height: '100vh', background: '#fff', boxShadow: '-4px 0 24px rgba(16,16,26,.15)', display: 'grid', gridTemplateRows: 'auto 1fr', animation: 'tf-pop .2s ease' }}>
-            <header style={{ padding: '18px 24px', borderBottom: '1px solid #f2f2f5', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', color: '#9a9aa4', fontWeight: 600 }}>{detail.id}</span>
-              <span style={{ fontSize: '11.5px', fontWeight: 700, color: detail.statusColor, background: `color-mix(in srgb, ${detail.statusColor} 12%, #fff)`, padding: '3px 10px', borderRadius: '20px' }}>{detail.statusLabel}</span>
-              <button onClick={() => setSelectedId(null)} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', fontSize: '20px', cursor: 'pointer', color: '#8a8a94', padding: '4px' }}>×</button>
+        <div onClick={() => setSelectedId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', zIndex: 50, animation: 'tf-overlay .15s ease' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '820px', maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: '18px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', animation: 'tf-pop .2s ease' }}>
+            <header style={{ padding: '22px 26px', borderBottom: '1px solid #f0f0f3', display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky', top: 0, background: '#fff', zIndex: 10, borderRadius: '18px 18px 0 0' }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: '#9a9aa4', fontWeight: 600 }}>{detail.id}</span>
+              <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#7a7a86', background: '#f1f1f5', padding: '3px 9px', borderRadius: '6px' }}>{detail.tag}</span>
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: taskPriorityMeta?.color, background: taskPriorityMeta?.bg, padding: '3px 9px', borderRadius: '6px' }}>{taskPriorityMeta?.label}</span>
+              <button onClick={() => setSelectedId(null)} style={{ marginLeft: 'auto', width: '30px', height: '30px', borderRadius: '8px', border: 'none', background: '#f3f3f6', cursor: 'pointer', fontSize: '16px', color: '#6b6b76', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
             </header>
 
-            <div style={{ overflowY: 'auto', display: 'grid', gridTemplateColumns: '1.5fr 1fr' }}>
-              <div style={{ padding: '24px', borderRight: '1px solid #f2f2f5' }}>
-                <div style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1.35, marginBottom: '8px' }}>{detail.title}</div>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '22px' }}>
-                  <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#7a7a86', background: '#f1f1f5', padding: '2px 8px', borderRadius: '6px' }}>{detail.tag}</span>
-                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: taskPriorityMeta?.color, background: taskPriorityMeta?.bg, padding: '2px 8px', borderRadius: '6px' }}>{taskPriorityMeta?.label}</span>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 0 }}>
+              <div style={{ padding: '24px 26px', borderRight: '1px solid #f0f0f3' }}>
+                <div style={{ fontSize: '20px', fontWeight: 800, lineHeight: 1.25, letterSpacing: '-0.01em', marginBottom: '18px' }}>{detail.title}</div>
                 
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '8px' }}>Description</div>
-                <div style={{ fontSize: '14px', lineHeight: 1.55, color: '#33333f', marginBottom: '26px', whiteSpace: 'pre-wrap' }}>{detail.desc}</div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                  <button onClick={() => handleMoveTask(selectedTask.id, 'todo')} style={{ flex: 1, padding: '9px', borderRadius: '9px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', border: `1px solid ${selectedTask.status === 'todo' ? '#64748b' : '#e1e1e8'}`, background: selectedTask.status === 'todo' ? '#64748b' : '#fff', color: selectedTask.status === 'todo' ? '#fff' : '#6b6b76' }}>To Do</button>
+                  <button onClick={() => handleMoveTask(selectedTask.id, 'inprogress')} style={{ flex: 1, padding: '9px', borderRadius: '9px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', border: `1px solid ${selectedTask.status === 'inprogress' ? '#f59e0b' : '#e1e1e8'}`, background: selectedTask.status === 'inprogress' ? '#f59e0b' : '#fff', color: selectedTask.status === 'inprogress' ? '#fff' : '#6b6b76' }}>In Progress</button>
+                  <button onClick={() => handleMoveTask(selectedTask.id, 'done')} style={{ flex: 1, padding: '9px', borderRadius: '9px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', border: `1px solid ${selectedTask.status === 'done' ? '#10b981' : '#e1e1e8'}`, background: selectedTask.status === 'done' ? '#10b981' : '#fff', color: selectedTask.status === 'done' ? '#fff' : '#6b6b76' }}>Done</button>
+                </div>
+
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '7px' }}>Description</div>
+                <div style={{ fontSize: '13.5px', color: '#55555e', lineHeight: 1.65, marginBottom: '22px', whiteSpace: 'pre-wrap' }}>{detail.desc}</div>
+
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '10px' }}>Progress — {selectedTask.progress}%</div>
+                <input type="range" min="0" max="100" step="5" value={selectedTask.progress} onChange={e => handleSetProgress(selectedTask.id, parseInt(e.target.value, 10))} style={{ width: '100%', cursor: 'pointer', accentColor: settings.accent, marginBottom: '22px' }} />
 
                 {detail.images.length > 0 && (
                   <>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '8px' }}>Attachments</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '26px' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '10px' }}>Attachments</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '22px' }}>
                       {detail.images.map((src, i) => (
                         <a key={i} href={src} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '104px', height: '104px', borderRadius: '11px', overflow: 'hidden', border: '1px solid #e6e6ec' }}>
                           <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1303,30 +1330,30 @@ export default function App() {
                 )}
 
                 <div style={{ borderTop: '1px solid #f2f2f5', paddingTop: '22px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '14px' }}>Comments ({detail.comments.length})</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '12px' }}>Comments ({detail.comments.length})</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
                     {detail.comments.map(c => (
                       <div key={c.id} style={{ display: 'flex', gap: '10px' }}>
-                        <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: '#94a3b8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px', flex: 'none', marginTop: '2px' }}>{getInitials(c.author)}</div>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#94a3b8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10.5px', flex: 'none', marginTop: '2px' }}>{getInitials(c.author)}</div>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: 700 }}>{c.author}</span>
+                            <span style={{ fontSize: '12.5px', fontWeight: 700 }}>{c.author}</span>
                             <span style={{ fontSize: '11px', color: '#a0a0aa' }}>{c.time}</span>
                           </div>
-                          <div style={{ fontSize: '13px', color: '#33333f', lineHeight: 1.45 }}>{c.text}</div>
+                          <div style={{ fontSize: '13px', color: '#55555e', lineHeight: 1.45 }}>{c.text}</div>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '10px', background: '#f7f7fa', border: '1px solid #eaeaef', borderRadius: '12px', padding: '10px' }}>
-                    <textarea value={commentDraft} onChange={e => setCommentDraft(e.target.value)} placeholder="Write a comment..." style={{ flex: 1, border: 'none', background: 'transparent', resize: 'none', fontSize: '13px', outline: 'none', height: '54px', fontFamily: 'inherit' }}></textarea>
-                    <button onClick={handlePostComment} style={{ alignSelf: 'flex-end', padding: '9px 15px', border: 'none', borderRadius: '9px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer' }}>Post</button>
+                  <div style={{ display: 'flex', gap: '9px', marginTop: '4px' }}>
+                    <input value={commentDraft} onChange={e => setCommentDraft(e.target.value)} placeholder="Add a comment…" style={{ flex: 1, padding: '9px 12px', border: '1px solid #e1e1e8', borderRadius: '9px', fontSize: '13px', outline: 'none' }} />
+                    <button onClick={handlePostComment} style={{ padding: '9px 15px', border: 'none', borderRadius: '9px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer' }}>Post</button>
                   </div>
                 </div>
               </div>
 
-              <div style={{ padding: '24px', background: '#fbfbfc', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+              <div style={{ padding: '24px 24px', background: '#fbfbfc', borderRadius: '0 0 18px 0', display: 'flex', flexDirection: 'column', gap: '22px' }}>
                 <div>
                   <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '8px' }}>Assignee</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1339,20 +1366,6 @@ export default function App() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '12px' }}>Update Status</div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => handleMoveTask(selectedTask.id, 'todo')} style={{ flex: 1, padding: '7px 4px', border: `1px solid ${selectedTask.status === 'todo' ? '#64748b' : '#e1e1e8'}`, borderRadius: '8px', fontSize: '12px', fontWeight: 600, background: selectedTask.status === 'todo' ? '#64748b' : '#fff', color: selectedTask.status === 'todo' ? '#fff' : '#6b6b76', cursor: 'pointer' }}>To Do</button>
-                    <button onClick={() => handleMoveTask(selectedTask.id, 'inprogress')} style={{ flex: 1, padding: '7px 4px', border: `1px solid ${selectedTask.status === 'inprogress' ? '#f59e0b' : '#e1e1e8'}`, borderRadius: '8px', fontSize: '12px', fontWeight: 600, background: selectedTask.status === 'inprogress' ? '#f59e0b' : '#fff', color: selectedTask.status === 'inprogress' ? '#fff' : '#6b6b76', cursor: 'pointer' }}>Active</button>
-                    <button onClick={() => handleMoveTask(selectedTask.id, 'done')} style={{ flex: 1, padding: '7px 4px', border: `1px solid ${selectedTask.status === 'done' ? '#10b981' : '#e1e1e8'}`, borderRadius: '8px', fontSize: '12px', fontWeight: 600, background: selectedTask.status === 'done' ? '#10b981' : '#fff', color: selectedTask.status === 'done' ? '#fff' : '#6b6b76', cursor: 'pointer' }}>Done</button>
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '8px' }}>Task Progress ({selectedTask.progress}%)</div>
-                  <input type="range" min="0" max="100" value={selectedTask.progress} onChange={e => handleSetProgress(selectedTask.id, parseInt(e.target.value, 10))} style={{ width: '100%', cursor: 'pointer', accentColor: settings.accent }} />
-                </div>
-
-                <div>
                   <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '12px' }}>Timeline</div>
                   <div style={{ position: 'relative', paddingLeft: '6px' }}>
                     {timelineData.map((tl, i) => (
@@ -1360,7 +1373,7 @@ export default function App() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: tl.dot, border: `2px solid ${tl.ring}`, flex: 'none', zIndex: 1 }}></div>
                           {i < timelineData.length - 1 && (
-                            <div style={{ width: '2px', flex: 1, background: '#e6e6ec' }}></div>
+                            <div style={{ width: '2px', flex: 1, background: '#e6e6ec', minHeight: '16px' }}></div>
                           )}
                         </div>
                         <div style={{ marginTop: '-2px' }}>

@@ -78,10 +78,16 @@ model Attachment {
 }
 
 model Settings {
-  id           Int    @id @default(1)
-  companyName  String @default("Morango AI") @map("company_name")
-  accent       String @default("#4f46e5")
-  sidebarTheme String @default("light") @map("sidebar_theme")
+  id             Int      @id @default(1)
+  companyName    String   @default("Morango AI") @map("company_name")
+  accent         String   @default("#4f46e5")
+  sidebarTheme   String   @default("light") @map("sidebar_theme")
+  smtpHost       String?  @map("smtp_host")
+  smtpPort       String?  @map("smtp_port")
+  smtpUser       String?  @map("smtp_user")
+  smtpPassword   String?  @map("smtp_password")
+  smtpFrom       String?  @map("smtp_from")
+  emailEnabled   Boolean  @default(false) @map("email_enabled")
 
   @@map("settings")
 }

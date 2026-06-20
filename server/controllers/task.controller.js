@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const { formatRelativeTime } = require('../utils/time');
+const { sendAssignmentEmail } = require('../utils/email');
 
 // 1. SECURE: Get tasks (filtered by permissions)
 async function getTasks(req, res) {
@@ -103,6 +104,15 @@ async function createTask(req, res) {
           message: `You have been assigned task ${nextId}: "${title}"`
         }
       });
+
+      // Dispatch assignment email notification asynchronously
+      prisma.user.findUnique({ where: { id: assigneeId } })
+        .then(assignee => {
+          if (assignee && assignee.email) {
+            sendAssignmentEmail(assignee.email, assignee.name, nextId, title);
+          }
+        })
+        .catch(err => console.error('Error sending assignment email:', err));
     }
 
     if (images && Array.isArray(images)) {
@@ -194,6 +204,15 @@ async function updateTask(req, res) {
           message: `Task ${id} has been assigned to you: "${title || task.title}"`
         }
       });
+
+      // Dispatch assignment email notification asynchronously
+      prisma.user.findUnique({ where: { id: newAssigneeId } })
+        .then(assignee => {
+          if (assignee && assignee.email) {
+            sendAssignmentEmail(assignee.email, assignee.name, id, title || task.title);
+          }
+        })
+        .catch(err => console.error('Error sending assignment email:', err));
     }
 
     const updated = await prisma.task.update({
