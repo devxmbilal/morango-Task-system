@@ -74,7 +74,7 @@ async function createTask(req, res) {
     const allTasks = await prisma.task.findMany({
       orderBy: { id: 'asc' }
     });
-    let taskNum = 1001 + allTasks.length;
+    let taskNum = 100001 + allTasks.length;
     let nextId = `TASK-${taskNum}`;
     
     while (allTasks.some(t => t.id === nextId)) {

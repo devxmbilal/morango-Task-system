@@ -56,16 +56,16 @@ async function main() {
 
   // 5. Create Tasks
   const tasks = [
-    { id: 'TASK-1001', title: 'Design onboarding flow screens', description: 'Create the 4-step onboarding flow for new mobile users including welcome, permissions, profile setup and tutorial.', assigneeId: 'u5', status: 'inprogress', priority: 'high', tag: 'Mobile App', createdDate: new Date('2026-06-14'), startDate: new Date('2026-06-16'), dueDate: new Date('2026-06-22'), progress: 45 },
-    { id: 'TASK-1002', title: 'Implement JWT authentication', description: 'Add access + refresh token auth with role claims and secure cookie storage.', assigneeId: 'u3', status: 'inprogress', priority: 'urgent', tag: 'Backend API', createdDate: new Date('2026-06-13'), startDate: new Date('2026-06-15'), dueDate: new Date('2026-06-20'), progress: 65 },
-    { id: 'TASK-1003', title: 'Build responsive navbar component', description: 'Sticky responsive navbar with mobile drawer and active-state highlighting.', assigneeId: 'u2', status: 'todo', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-17'), startDate: null, dueDate: new Date('2026-06-25'), progress: 0 },
-    { id: 'TASK-1004', title: 'Write E2E test suite for checkout', description: 'Cover happy path + edge cases for the checkout funnel using Playwright.', assigneeId: 'u4', status: 'todo', priority: 'high', tag: 'QA', createdDate: new Date('2026-06-16'), startDate: null, dueDate: new Date('2026-06-28'), progress: 0 },
-    { id: 'TASK-1005', title: 'Set up CI/CD pipeline', description: 'GitHub Actions pipeline with lint, test, build and staging deploy.', assigneeId: 'u6', status: 'done', priority: 'high', tag: 'DevOps', createdDate: new Date('2026-06-08'), startDate: new Date('2026-06-09'), dueDate: new Date('2026-06-15'), progress: 100 },
-    { id: 'TASK-1006', title: 'Fix payment gateway timeout bug', description: 'Investigate intermittent 504s on the Stripe webhook handler under load.', assigneeId: 'u3', status: 'todo', priority: 'urgent', tag: 'Backend API', createdDate: new Date('2026-06-12'), startDate: null, dueDate: new Date('2026-06-18'), progress: 0 },
-    { id: 'TASK-1007', title: 'Create dashboard analytics charts', description: 'Revenue, active users and retention charts with date-range filter.', assigneeId: 'u2', status: 'inprogress', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-15'), startDate: new Date('2026-06-17'), dueDate: new Date('2026-06-30'), progress: 30 },
-    { id: 'TASK-1008', title: 'Design email notification templates', description: 'Responsive HTML email templates for invites, resets and digests.', assigneeId: 'u5', status: 'done', priority: 'low', tag: 'Mobile App', createdDate: new Date('2026-06-06'), startDate: new Date('2026-06-07'), dueDate: new Date('2026-06-12'), progress: 100 },
-    { id: 'TASK-1009', title: 'Optimize database queries', description: 'Add indexes and remove N+1 queries on the reports endpoints.', assigneeId: 'u6', status: 'todo', priority: 'medium', tag: 'Backend API', createdDate: new Date('2026-06-18'), startDate: null, dueDate: new Date('2026-07-02'), progress: 0 },
-    { id: 'TASK-1010', title: 'User profile settings page', description: 'Editable profile with avatar upload, password change and preferences.', assigneeId: 'u2', status: 'done', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-09'), startDate: new Date('2026-06-10'), dueDate: new Date('2026-06-16'), progress: 100 }
+    { id: 'TASK-100001', title: 'Design onboarding flow screens', description: 'Create the 4-step onboarding flow for new mobile users including welcome, permissions, profile setup and tutorial.', assigneeId: 'u5', status: 'inprogress', priority: 'high', tag: 'Mobile App', createdDate: new Date('2026-06-14'), startDate: new Date('2026-06-16'), dueDate: new Date('2026-06-22'), progress: 45 },
+    { id: 'TASK-100002', title: 'Implement JWT authentication', description: 'Add access + refresh token auth with role claims and secure cookie storage.', assigneeId: 'u3', status: 'inprogress', priority: 'urgent', tag: 'Backend API', createdDate: new Date('2026-06-13'), startDate: new Date('2026-06-15'), dueDate: new Date('2026-06-20'), progress: 65 },
+    { id: 'TASK-100003', title: 'Build responsive navbar component', description: 'Sticky responsive navbar with mobile drawer and active-state highlighting.', assigneeId: 'u2', status: 'todo', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-17'), startDate: null, dueDate: new Date('2026-06-25'), progress: 0 },
+    { id: 'TASK-100004', title: 'Write E2E test suite for checkout', description: 'Cover happy path + edge cases for the checkout funnel using Playwright.', assigneeId: 'u4', status: 'todo', priority: 'high', tag: 'QA', createdDate: new Date('2026-06-16'), startDate: null, dueDate: new Date('2026-06-28'), progress: 0 },
+    { id: 'TASK-100005', title: 'Set up CI/CD pipeline', description: 'GitHub Actions pipeline with lint, test, build and staging deploy.', assigneeId: 'u6', status: 'done', priority: 'high', tag: 'DevOps', createdDate: new Date('2026-06-08'), startDate: new Date('2026-06-09'), dueDate: new Date('2026-06-15'), progress: 100 },
+    { id: 'TASK-100006', title: 'Fix payment gateway timeout bug', description: 'Investigate intermittent 504s on the Stripe webhook handler under load.', assigneeId: 'u3', status: 'todo', priority: 'urgent', tag: 'Backend API', createdDate: new Date('2026-06-12'), startDate: null, dueDate: new Date('2026-06-18'), progress: 0 },
+    { id: 'TASK-100007', title: 'Create dashboard analytics charts', description: 'Revenue, active users and retention charts with date-range filter.', assigneeId: 'u2', status: 'inprogress', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-15'), startDate: new Date('2026-06-17'), dueDate: new Date('2026-06-30'), progress: 30 },
+    { id: 'TASK-100008', title: 'Design email notification templates', description: 'Responsive HTML email templates for invites, resets and digests.', assigneeId: 'u5', status: 'done', priority: 'low', tag: 'Mobile App', createdDate: new Date('2026-06-06'), startDate: new Date('2026-06-07'), dueDate: new Date('2026-06-12'), progress: 100 },
+    { id: 'TASK-100009', title: 'Optimize database queries', description: 'Add indexes and remove N+1 queries on the reports endpoints.', assigneeId: 'u6', status: 'todo', priority: 'medium', tag: 'Backend API', createdDate: new Date('2026-06-18'), startDate: null, dueDate: new Date('2026-07-02'), progress: 0 },
+    { id: 'TASK-100010', title: 'User profile settings page', description: 'Editable profile with avatar upload, password change and preferences.', assigneeId: 'u2', status: 'done', priority: 'medium', tag: 'Web Portal', createdDate: new Date('2026-06-09'), startDate: new Date('2026-06-10'), dueDate: new Date('2026-06-16'), progress: 100 }
   ];
 
   for (const task of tasks) {
@@ -76,7 +76,7 @@ async function main() {
   // 6. Create Comments
   await prisma.comment.create({
     data: {
-      taskId: 'TASK-1001',
+      taskId: 'TASK-100001',
       authorName: 'Ayesha Khan',
       text: 'Please align with the new brand colors.',
       createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
@@ -85,7 +85,7 @@ async function main() {
 
   await prisma.comment.create({
     data: {
-      taskId: 'TASK-1006',
+      taskId: 'TASK-100006',
       authorName: 'Usman Tariq',
       text: 'Reproduced on staging twice today.',
       createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago

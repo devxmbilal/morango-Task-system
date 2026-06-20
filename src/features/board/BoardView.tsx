@@ -112,6 +112,18 @@ const BoardView: React.FC<BoardViewProps> = ({
                     <span
                       style={{
                         fontSize: '10.5px',
+                        fontWeight: 700,
+                        color: settings.accent,
+                        background: `color-mix(in srgb, ${settings.accent} 10%, #fff)`,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      #{item.id.replace('TASK-', '')}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '10.5px',
                         fontWeight: 600,
                         color: '#7a7a86',
                         background: '#f1f1f5',
