@@ -1,0 +1,11 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #f6f7f9; min-height: 100vh; }
+input, textarea, select, button { font-family: 'Plus Jakarta Sans', sans-serif; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent, #4f46e5) !important; }
+::placeholder { color: #a3a3ad; }
+
+@keyframes tf-overlay { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tf-pop { from { opacity: 0; transform: translateY(12px) scale(.99); } to { opacity: 1; transform: none; } }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d6d6de; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }

@@ -1,0 +1,280 @@
+const prisma = require('../config/prisma');
+const { formatRelativeTime } = require('../utils/time');
+
+// 1. SECURE: Get tasks (filtered by permissions)
+async function getTasks(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { role: true }
+    });
+
+    const perms = user?.role || {};
+    let tasks;
+
+    if (perms.permAllTasks) {
+      tasks = await prisma.task.findMany({
+        include: {
+          assignee: true,
+          comments: { orderBy: { createdAt: 'desc' } },
+          attachments: true
+        },
+        orderBy: { id: 'desc' }
+      });
+    } else {
+      tasks = await prisma.task.findMany({
+        where: { assigneeId: req.user.id },
+        include: {
+          assignee: true,
+          comments: { orderBy: { createdAt: 'desc' } },
+          attachments: true
+        },
+        orderBy: { id: 'desc' }
+      });
+    }
+
+    const formattedTasks = tasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      desc: t.description || '',
+      assigneeId: t.assigneeId || '',
+      status: t.status,
+      priority: t.priority,
+      tag: t.tag,
+      created: t.createdDate.toISOString().slice(0, 10),
+      start: t.startDate ? t.startDate.toISOString().slice(0, 10) : '',
+      due: t.dueDate.toISOString().slice(0, 10),
+      progress: t.progress,
+      images: t.attachments.map(att => att.fileUrl),
+      comments: t.comments.map(c => ({
+        id: c.id,
+        author: c.authorName,
+        text: c.text,
+        time: formatRelativeTime(c.createdAt)
+      }))
+    }));
+
+    res.json(formattedTasks);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve tasks' });
+  }
+}
+
+// 2. SECURE: Create task
+async function createTask(req, res) {
+  const { title, desc, assigneeId, priority, tag, due, images } = req.body;
+
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  try {
+    const allTasks = await prisma.task.findMany({
+      orderBy: { id: 'asc' }
+    });
+    let taskNum = 1001 + allTasks.length;
+    let nextId = `TASK-${taskNum}`;
+    
+    while (allTasks.some(t => t.id === nextId)) {
+      taskNum++;
+      nextId = `TASK-${taskNum}`;
+    }
+
+    const newTask = await prisma.task.create({
+      data: {
+        id: nextId,
+        title,
+        description: desc || '',
+        assigneeId: assigneeId || null,
+        status: 'todo',
+        priority: priority || 'medium',
+        tag: tag || 'Web Portal',
+        dueDate: new Date(due),
+        createdDate: new Date()
+      }
+    });
+
+    if (assigneeId) {
+      await prisma.notification.create({
+        data: {
+          userId: assigneeId,
+          title: 'New Task Assigned',
+          message: `You have been assigned task ${nextId}: "${title}"`
+        }
+      });
+    }
+
+    if (images && Array.isArray(images)) {
+      for (const imgUrl of images) {
+        await prisma.attachment.create({
+          data: {
+            taskId: newTask.id,
+            fileUrl: imgUrl
+          }
+        });
+      }
+    }
+
+    const created = await prisma.task.findUnique({
+      where: { id: newTask.id },
+      include: {
+        assignee: true,
+        comments: true,
+        attachments: true
+      }
+    });
+
+    res.json({
+      id: created.id,
+      title: created.title,
+      desc: created.description,
+      assigneeId: created.assigneeId || '',
+      status: created.status,
+      priority: created.priority,
+      tag: created.tag,
+      created: created.createdDate.toISOString().slice(0, 10),
+      start: created.startDate ? created.startDate.toISOString().slice(0, 10) : '',
+      due: created.dueDate.toISOString().slice(0, 10),
+      progress: created.progress,
+      images: created.attachments.map(att => att.fileUrl),
+      comments: []
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create task' });
+  }
+}
+
+// 3. SECURE: Update task
+async function updateTask(req, res) {
+  const { id } = req.params;
+  const { status, progress, title, desc, assigneeId, priority, tag, due } = req.body;
+
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id }
+    });
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const data = {};
+    if (status !== undefined) data.status = status;
+    if (progress !== undefined) {
+      data.progress = parseInt(progress, 10);
+      if (data.progress >= 100) {
+        data.status = 'done';
+      } else if (data.progress > 0 && task.status === 'todo') {
+        data.status = 'inprogress';
+      } else if (data.progress === 0 && task.status === 'inprogress') {
+        data.status = 'todo';
+      }
+    }
+    if (title !== undefined) data.title = title;
+    if (desc !== undefined) data.description = desc;
+    if (assigneeId !== undefined) data.assigneeId = assigneeId || null;
+    if (priority !== undefined) data.priority = priority;
+    if (tag !== undefined) data.tag = tag;
+    if (due !== undefined) data.dueDate = new Date(due);
+
+    if (status === 'inprogress' && !task.startDate) {
+      data.startDate = new Date();
+    }
+
+    const oldAssigneeId = task.assigneeId;
+    const newAssigneeId = assigneeId !== undefined ? (assigneeId || null) : oldAssigneeId;
+
+    if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
+      await prisma.notification.create({
+        data: {
+          userId: newAssigneeId,
+          title: 'Task Assigned',
+          message: `Task ${id} has been assigned to you: "${title || task.title}"`
+        }
+      });
+    }
+
+    const updated = await prisma.task.update({
+      where: { id },
+      data,
+      include: {
+        assignee: true,
+        comments: { orderBy: { createdAt: 'desc' } },
+        attachments: true
+      }
+    });
+
+    res.json({
+      id: updated.id,
+      title: updated.title,
+      desc: updated.description,
+      assigneeId: updated.assigneeId || '',
+      status: updated.status,
+      priority: updated.priority,
+      tag: updated.tag,
+      created: updated.createdDate.toISOString().slice(0, 10),
+      start: updated.startDate ? updated.startDate.toISOString().slice(0, 10) : '',
+      due: updated.dueDate.toISOString().slice(0, 10),
+      progress: updated.progress,
+      images: updated.attachments.map(att => att.fileUrl),
+      comments: updated.comments.map(c => ({
+        id: c.id,
+        author: c.authorName,
+        text: c.text,
+        time: formatRelativeTime(c.createdAt)
+      }))
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update task' });
+  }
+}
+
+// 4. SECURE: Add comment
+async function addComment(req, res) {
+  const { id } = req.params;
+  const { text } = req.body;
+
+  if (!text) {
+    return res.status(400).json({ error: 'Comment text is required' });
+  }
+
+  try {
+    const newComment = await prisma.comment.create({
+      data: {
+        taskId: id,
+        authorName: req.user.name,
+        text
+      }
+    });
+
+    res.json({
+      id: newComment.id,
+      author: newComment.authorName,
+      text: newComment.text,
+      time: 'just now'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+}
+
+// 5. SECURE: Upload attachment
+function uploadAttachment(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ fileUrl });
+}
+
+module.exports = {
+  getTasks,
+  createTask,
+  updateTask,
+  addComment,
+  uploadAttachment
+};

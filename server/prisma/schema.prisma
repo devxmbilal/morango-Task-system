@@ -1,0 +1,99 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id             String   @id
+  name           String
+  color          String
+  system         Boolean  @default(false)
+  permAllTasks   Boolean  @default(false)
+  permCreate     Boolean  @default(false)
+  permTeam       Boolean  @default(false)
+  permRoles      Boolean  @default(false)
+  permReports    Boolean  @default(false)
+  permSettings   Boolean  @default(false)
+  users          User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String   @id
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  roleId       String?  @map("role_id")
+  role         Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  title        String?
+  color        String?
+  tasks        Task[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String       @id
+  title       String
+  description String?
+  assigneeId  String?      @map("assignee_id")
+  assignee    User?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  status      String       @default("todo") // "todo", "inprogress", "done"
+  priority    String       @default("medium") // "low", "medium", "high", "urgent"
+  tag         String       @default("Web Portal")
+  createdDate DateTime     @default(now()) @map("created_date") @db.Date
+  startDate   DateTime?    @map("start_date") @db.Date
+  dueDate     DateTime     @map("due_date") @db.Date
+  progress    Int          @default(0)
+  comments    Comment[]
+  attachments Attachment[]
+
+  @@map("tasks")
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  taskId     String   @map("task_id")
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorName String   @map("author_name")
+  text       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("comments")
+}
+
+model Attachment {
+  id      Int    @id @default(autoincrement())
+  taskId  String @map("task_id")
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileUrl String @map("file_url")
+
+  @@map("task_attachments")
+}
+
+model Settings {
+  id           Int    @id @default(1)
+  companyName  String @default("Morango AI") @map("company_name")
+  accent       String @default("#4f46e5")
+  sidebarTheme String @default("light") @map("sidebar_theme")
+
+  @@map("settings")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
