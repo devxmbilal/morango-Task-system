@@ -17,6 +17,8 @@ interface BoardViewProps {
   onDragStart: (id: string) => void;
   onDrop: (status: string) => void;
   onSelectTask: (id: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 const BoardView: React.FC<BoardViewProps> = ({
@@ -26,11 +28,32 @@ const BoardView: React.FC<BoardViewProps> = ({
   onDragStart,
   onDrop,
   onSelectTask,
+  searchQuery,
+  onSearchChange,
 }) => {
   const getUserById = (id: string) => members.find(m => m.id === id);
 
   return (
-    <div className="board-container" style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', width: '100%' }}>
+      {/* Board Search Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #ececf1', borderRadius: '12px', padding: '10px 14px', maxWidth: '360px', width: '100%' }}>
+        <span style={{ marginRight: '8px', fontSize: '15px', color: '#8a8a94' }}>🔍</span>
+        <input
+          type="text"
+          placeholder="Search board tickets..."
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+          style={{
+            border: 'none',
+            outline: 'none',
+            fontSize: '13.5px',
+            width: '100%',
+            background: 'transparent',
+          }}
+        />
+      </div>
+
+      <div className="board-container" style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', width: '100%' }}>
       {columns.map(col => (
         <div
           key={col.key}
@@ -221,6 +244,7 @@ const BoardView: React.FC<BoardViewProps> = ({
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 };

@@ -633,7 +633,7 @@ export default function App() {
                     <Navigate to="/mytasks" replace />
                   )
                 } />
-                <Route path="/board" element={<BoardView columns={getBoardColumns()} members={members} settings={settings} dragId={dragId} onDragStart={setDragId} onDrop={status => handleMoveTask(dragId || '', status)} onSelectTask={setSelectedId} />} />
+                <Route path="/board" element={<BoardView columns={getBoardColumns()} members={members} settings={settings} dragId={dragId} onDragStart={setDragId} onDrop={status => handleMoveTask(dragId || '', status)} onSelectTask={setSelectedId} searchQuery={searchQuery} onSearchChange={setSearchQuery} />} />
                 <Route path="/tasks" element={
                   user.perms?.permAllTasks ? (
                     <TasksView filteredTasks={filteredTasks} members={members} settings={settings} searchQuery={searchQuery} onSearchChange={setSearchQuery} onSelectTask={setSelectedId} onEditTask={handleOpenEditTask} onDeleteTask={handleDeleteTask} />
