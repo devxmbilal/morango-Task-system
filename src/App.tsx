@@ -98,7 +98,7 @@ export default function App() {
   });
 
   // Navigation and views
-  const [view, setView] = useState<string>('dashboard');
+  const [view, setView] = useState<string>(() => localStorage.getItem('morango_view') || 'dashboard');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -116,6 +116,7 @@ export default function App() {
   // Notifications states
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   
   // Modal toggles & form states
   const [addingMember, setAddingMember] = useState<boolean>(false);
@@ -134,12 +135,47 @@ export default function App() {
     assigneeId: 'u2',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     tag: 'Web Portal',
-    due: '2026-06-30',
+    due: '2026-06-30T18:00',
     images: [] as string[]
+  });
+
+  // Editing states
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editTaskForm, setEditTaskForm] = useState({
+    title: '',
+    desc: '',
+    assigneeId: '',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+    tag: 'Web Portal',
+    due: ''
+  });
+
+  const [editingMember, setEditingMember] = useState<any | null>(null);
+  const [editMemberForm, setEditMemberForm] = useState({
+    name: '',
+    email: '',
+    title: '',
+    roleId: '',
+    isActive: true,
+    password: ''
   });
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', password: '' });
+  const [profileMessage, setProfileMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        name: user.name || '',
+        email: user.email || '',
+        password: ''
+      });
+      setProfileMessage(null);
+    }
+  }, [user]);
 
   // Poll notifications
   useEffect(() => {
@@ -161,12 +197,20 @@ export default function App() {
       fetchProfile();
     } else {
       localStorage.removeItem('morango_token');
+      localStorage.removeItem('morango_view');
       setUser(null);
       setTasks([]);
       setMembers([]);
       setRoles([]);
     }
   }, [token]);
+
+  // Persist active view on changes
+  useEffect(() => {
+    if (token && view) {
+      localStorage.setItem('morango_view', view);
+    }
+  }, [view, token]);
 
   // Fetch functions
   const fetchSettings = async () => {
@@ -189,7 +233,29 @@ export default function App() {
       if (res.ok) {
         setUser(data);
         const perms = data.perms || {};
-        setView(perms.allTasks ? 'dashboard' : 'mytasks');
+        
+        // Restore active view from localStorage if valid
+        const savedView = localStorage.getItem('morango_view');
+        let initialView = perms.permAllTasks ? 'dashboard' : 'mytasks';
+        if (savedView) {
+          if (savedView === 'dashboard' && !perms.permAllTasks) {
+            initialView = 'mytasks';
+          } else if (savedView === 'tasks' && !perms.permAllTasks) {
+            initialView = 'mytasks';
+          } else if (savedView === 'team' && !perms.permTeam) {
+            initialView = perms.permAllTasks ? 'dashboard' : 'mytasks';
+          } else if (savedView === 'roles' && !perms.permRoles) {
+            initialView = perms.permAllTasks ? 'dashboard' : 'mytasks';
+          } else if (savedView === 'reports' && !perms.permReports) {
+            initialView = perms.permAllTasks ? 'dashboard' : 'mytasks';
+          } else if (savedView === 'settings' && !perms.permSettings) {
+            initialView = perms.permAllTasks ? 'dashboard' : 'mytasks';
+          } else {
+            initialView = savedView;
+          }
+        }
+        setView(initialView);
+
         // Fetch private tables
         fetchTasks();
         fetchMembers();
@@ -403,7 +469,7 @@ export default function App() {
           assigneeId: 'u2',
           priority: 'medium',
           tag: 'Web Portal',
-          due: '2026-06-30',
+          due: '2026-06-30T18:00',
           images: []
         });
       }
@@ -433,7 +499,130 @@ export default function App() {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchTasks();
+        if (selectedId === taskId) setSelectedId(null);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskForm({
+      title: task.title,
+      desc: task.desc,
+      assigneeId: task.assigneeId,
+      priority: task.priority,
+      tag: task.tag,
+      due: toLocalDatetimeString(task.due)
+    });
+  };
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask) return;
+    try {
+      const res = await fetch(`${API_BASE}/tasks/${editingTask.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editTaskForm)
+      });
+      if (res.ok) {
+        setEditingTask(null);
+        fetchTasks();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Team Member Operations
+  const handleDeleteMember = async (memberId: string) => {
+    if (!window.confirm('Are you sure you want to delete this team member? All their assigned tasks will become unassigned.')) return;
+    try {
+      const res = await fetch(`${API_BASE}/members/${memberId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchMembers();
+        fetchTasks();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleOpenEditMember = (member: any) => {
+    setEditingMember(member);
+    setEditMemberForm({
+      name: member.name,
+      email: member.email,
+      title: member.title,
+      roleId: member.roleId || 'employee',
+      isActive: member.isActive !== false,
+      password: ''
+    });
+  };
+
+  const handleUpdateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    try {
+      const res = await fetch(`${API_BASE}/members/${editingMember.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editMemberForm)
+      });
+      if (res.ok) {
+        setEditingMember(null);
+        fetchMembers();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage(null);
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data);
+        setProfileForm(prev => ({ ...prev, password: '' }));
+        setProfileMessage({ text: 'Profile updated successfully!', type: 'success' });
+      } else {
+        setProfileMessage({ text: data.error || 'Failed to update profile', type: 'error' });
+      }
+    } catch (err) {
+      setProfileMessage({ text: 'Failed to connect to the server', type: 'error' });
+    }
+  };
+
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberForm.name.trim() || !memberForm.email.trim()) return;
@@ -525,13 +714,27 @@ export default function App() {
 
   const formatDate = (iso: string) => {
     if (!iso) return '—';
-    const d = new Date(iso + 'T00:00:00');
+    const hasTime = iso.includes('T');
+    const d = hasTime ? new Date(iso) : new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return '—';
+    if (hasTime) {
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + 
+             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const toLocalDatetimeString = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const getDaysLeft = (iso: string) => {
     if (!iso) return 0;
-    const d = new Date(iso + 'T00:00:00');
+    const d = new Date(iso);
     const t = new Date('2026-06-19T00:00:00'); // Consistent baseline
     return Math.round((d.getTime() - t.getTime()) / 86400000);
   };
@@ -565,7 +768,10 @@ export default function App() {
       label,
       count,
       showCount: count !== undefined,
-      onClick: () => setView(key),
+      onClick: () => {
+        setSearchQuery('');
+        setView(key);
+      },
       bg: view === key ? 'var(--side-active,#eef1ff)' : 'transparent',
       fg: view === key ? 'var(--accent,#4f46e5)' : 'var(--side-muted,#6b6b76)',
       dot: view === key ? 'var(--accent,#4f46e5)' : 'transparent',
@@ -574,7 +780,8 @@ export default function App() {
 
     if (perms.permAllTasks) {
       list.push(mkNav('dashboard', 'Dashboard'));
-      list.push(mkNav('board', 'Task Board', tasks.length));
+      list.push(mkNav('tasks', 'Tasks', tasks.length));
+      list.push(mkNav('board', 'Task Board'));
     } else {
       const myCount = tasks.filter(t => t.assigneeId === user?.id).length;
       list.push(mkNav('mytasks', 'My Tasks', myCount));
@@ -585,6 +792,7 @@ export default function App() {
     if (perms.permRoles) list.push(mkNav('roles', 'Roles'));
     if (perms.permReports) list.push(mkNav('reports', 'Reports'));
     if (perms.permSettings) list.push(mkNav('settings', 'Settings'));
+    list.push(mkNav('profile', 'My Profile'));
 
     return list;
   };
@@ -656,7 +864,7 @@ export default function App() {
     const done = mt.filter(t => t.status === 'done').length;
     const active = mt.filter(t => t.status === 'inprogress').length;
     const pct = mt.length ? Math.round((done / mt.length) * 100) : 0;
-    const r = roles.find(rl => rl.id === m.role) || { name: 'Member', color: '#64748b' };
+    const r = roles.find(rl => rl.id === (m.roleId || m.role)) || { name: 'Member', color: '#64748b' };
     return {
       id: m.id,
       name: m.name,
@@ -670,8 +878,18 @@ export default function App() {
       pct,
       roleLabel: r.name,
       roleColor: r.color,
-      roleBg: `color-mix(in srgb, ${r.color} 13%, #fff)`
+      roleBg: `color-mix(in srgb, ${r.color} 13%, #fff)`,
+      roleId: m.roleId || m.role,
+      isActive: m.isActive !== false
     };
+  });
+
+  const filteredMembers = teamMembers.filter(m => {
+    const query = searchQuery.toLowerCase();
+    return m.name.toLowerCase().includes(query) ||
+           m.email.toLowerCase().includes(query) ||
+           (m.title && m.title.toLowerCase().includes(query)) ||
+           (m.roleLabel && m.roleLabel.toLowerCase().includes(query));
   });
 
   // Task Details Modal variables
@@ -686,7 +904,7 @@ export default function App() {
   
   const timelineData = selectedTask ? [
     { label: 'Created', date: formatDate(selectedTask.created), dot: '#4f46e5', ring: '#dfdcff', fg: '#16161a' },
-    { label: selectedTask.start ? 'Started' : 'Not started', date: selectedTask.start ? formatDate(selectedTask.start) : 'pending', dot: selectedTask.start ? '#f59e0b' : '#d4d4dd', ring: selectedTask.start ? '#fdebc8' : '#eee', fg: selectedTask.start ? '#16161a' : '#9a9aa4' },
+    { label: selectedTask.start ? 'Assigned' : 'Unassigned', date: selectedTask.start ? formatDate(selectedTask.start) : 'pending', dot: selectedTask.start ? '#f59e0b' : '#d4d4dd', ring: selectedTask.start ? '#fdebc8' : '#eee', fg: selectedTask.start ? '#16161a' : '#9a9aa4' },
     { label: selectedTask.status === 'done' ? 'Completed' : 'Due', date: formatDate(selectedTask.due), dot: selectedTask.status === 'done' ? '#10b981' : '#dc2626', ring: selectedTask.status === 'done' ? '#c8f0d8' : '#fdd', fg: '#16161a' }
   ] : [];
 
@@ -802,14 +1020,10 @@ export default function App() {
                 <div style={{ fontSize: '12.5px', color: '#8a8a94' }}>Manage workspace operations and data.</div>
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f3f3f6', border: '1px solid #eaeaef', borderRadius: '10px', padding: '8px 12px', width: '230px', color: '#9a9aa4', fontSize: '13px' }}>
-                  <span style={{ fontSize: '13px' }}>⌕</span>
-                  <input type="text" placeholder="Search tickets..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: 'none', background: 'transparent', width: '100%', fontSize: '13px', outline: 'none', color: '#16161a' }} />
-                </div>
 
                 {/* Bell Icon Notification Indicator */}
                 <div style={{ position: 'relative' }}>
-                  <button onClick={() => setShowNotifications(!showNotifications)} style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '10px', border: '1px solid #eaeaef', background: '#fff', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b6b76' }} className="btn-hover">
+                  <button onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }} style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '10px', border: '1px solid #eaeaef', background: '#fff', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b6b76' }} className="btn-hover">
                     🔔
                     {notifications.filter(n => !n.read).length > 0 && (
                       <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '18px', height: '18px', borderRadius: '50%', background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -837,6 +1051,36 @@ export default function App() {
                             </div>
                           ))
                         )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Profile Button with Dropdown */}
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifications(false); }} style={{ width: '38px', height: '38px', borderRadius: '10px', border: '1px solid #eaeaef', background: user.color || '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }} title="My Profile" className="btn-hover">
+                    {getInitials(user.name)}
+                  </button>
+
+                  {showProfileMenu && (
+                    <div style={{ position: 'absolute', top: '46px', right: 0, width: '220px', background: '#fff', border: '1px solid #eaeaef', borderRadius: '14px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 10, padding: '8px', animation: 'tf-pop 0.15s ease' }}>
+                      <div style={{ padding: '8px 12px', borderBottom: '1px solid #f2f2f5', marginBottom: '6px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#16161a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+                        <div style={{ fontSize: '11px', color: '#8a8a94' }}>{user.title}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <button onClick={() => { setSearchQuery(''); setView('profile'); setShowProfileMenu(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', border: 'none', background: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#4b5563', cursor: 'pointer' }} className="btn-hover-item">
+                          👤 My Profile
+                        </button>
+                        {user.perms?.permSettings && (
+                          <button onClick={() => { setSearchQuery(''); setView('settings'); setShowProfileMenu(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', border: 'none', background: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#4b5563', cursor: 'pointer' }} className="btn-hover-item">
+                            ⚙️ Settings
+                          </button>
+                        )}
+                        <hr style={{ border: 'none', borderTop: '1px solid #f2f2f5', margin: '4px 0' }} />
+                        <button onClick={() => { handleLogout(); setShowProfileMenu(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', border: 'none', background: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#ef4444', cursor: 'pointer' }} className="btn-hover-item">
+                          🚪 Log Out
+                        </button>
                       </div>
                     </div>
                   )}
@@ -961,6 +1205,84 @@ export default function App() {
                 </div>
               )}
 
+              {/* 2.5 TASKS LIST VIEW */}
+              {view === 'tasks' && (
+                <div style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '16px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>All Workspace Tasks ({filteredTasks.length})</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f3f3f6', border: '1px solid #eaeaef', borderRadius: '10px', padding: '8px 12px', width: '260px', color: '#9a9aa4', fontSize: '13px' }}>
+                      <span style={{ fontSize: '13px' }}>⌕</span>
+                      <input type="text" placeholder="Search tasks..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: 'none', background: 'transparent', width: '100%', fontSize: '13px', outline: 'none', color: '#16161a' }} />
+                    </div>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #eef0f3', color: '#8a8a94', fontWeight: 700 }}>
+                          <th style={{ padding: '12px 8px' }}>ID</th>
+                          <th style={{ padding: '12px 8px' }}>Title</th>
+                          <th style={{ padding: '12px 8px' }}>Project</th>
+                          <th style={{ padding: '12px 8px' }}>Priority</th>
+                          <th style={{ padding: '12px 8px' }}>Status</th>
+                          <th style={{ padding: '12px 8px' }}>Progress</th>
+                          <th style={{ padding: '12px 8px' }}>Assignee</th>
+                          <th style={{ padding: '12px 8px' }}>Due Date</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#8a8a94' }}>No tasks found matching your search.</td>
+                          </tr>
+                        ) : (
+                          filteredTasks.map(item => {
+                            const assignee = getUserById(item.assigneeId);
+                            const sm = getStatusMeta(item.status);
+                            const pri = getPriorityMeta(item.priority);
+                            const dl = getDaysLeft(item.due);
+                            return (
+                              <tr key={item.id} style={{ borderBottom: '1px solid #eef0f3' }}>
+                                <td style={{ padding: '14px 8px', fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: '#9a9aa4' }}>{item.id}</td>
+                                <td onClick={() => setSelectedId(item.id)} style={{ padding: '14px 8px', fontWeight: 600, cursor: 'pointer', color: settings.accent }}>
+                                  <span style={{ textDecoration: 'underline' }}>{item.title}</span>
+                                </td>
+                                <td style={{ padding: '14px 8px' }}><span style={{ fontSize: '11px', fontWeight: 600, color: '#7a7a86', background: '#f1f1f5', padding: '2px 8px', borderRadius: '6px' }}>{item.tag}</span></td>
+                                <td style={{ padding: '14px 8px' }}><span style={{ fontSize: '11px', fontWeight: 700, color: pri.color, background: pri.bg, padding: '2px 8px', borderRadius: '6px' }}>{pri.label}</span></td>
+                                <td style={{ padding: '14px 8px' }}><span style={{ fontSize: '11px', fontWeight: 700, color: sm.color, background: `color-mix(in srgb, ${sm.color} 12%, #fff)`, padding: '3px 9px', borderRadius: '20px' }}>{sm.label}</span></td>
+                                <td style={{ padding: '14px 8px', width: '120px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ flex: 1, height: '6px', background: '#eef0f3', borderRadius: '6px', overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${item.progress}%`, background: settings.accent, borderRadius: '6px' }}></div>
+                                    </div>
+                                    <span style={{ fontSize: '11.5px', color: '#8a8a94', fontWeight: 600 }}>{item.progress}%</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '14px 8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '7px', background: assignee?.color || '#94a3b8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px' }}>{getInitials(assignee?.name || '?')}</div>
+                                    <span>{assignee?.name || 'Unassigned'}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '14px 8px', fontWeight: 600, color: item.status === 'done' ? '#059669' : (dl < 0 ? '#dc2626' : '#8a8a94') }}>
+                                  {formatDate(item.due)}
+                                </td>
+                                <td style={{ padding: '14px 8px', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => handleOpenEditTask(item)} style={{ padding: '4px 8px', border: '1px solid #e1e1e8', borderRadius: '6px', background: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#44444e' }}>Edit</button>
+                                    <button onClick={() => handleDeleteTask(item.id)} style={{ padding: '4px 8px', border: '1px solid #fee2e2', borderRadius: '6px', background: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#dc2626' }}>Delete</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* 3. MY TASKS VIEW */}
               {view === 'mytasks' && (
                 <>
@@ -1007,37 +1329,58 @@ export default function App() {
               {/* 4. TEAM WORKLOAD VIEW */}
               {view === 'team' && (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '18px' }}>
-                    <div style={{ fontSize: '13.5px', color: '#8a8a94', fontWeight: 600 }}>{teamMembers.length} members</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid #eaeaef', borderRadius: '10px', padding: '8px 12px', width: '260px', color: '#9a9aa4', fontSize: '13px' }}>
+                        <span style={{ fontSize: '13px' }}>⌕</span>
+                        <input type="text" placeholder="Search members..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: 'none', background: 'transparent', width: '100%', fontSize: '13px', outline: 'none', color: '#16161a' }} />
+                      </div>
+                      <span style={{ fontSize: '13.5px', color: '#8a8a94', fontWeight: 600 }}>
+                        {searchQuery ? `${filteredMembers.length} of ${teamMembers.length} members` : `${teamMembers.length} members`}
+                      </span>
+                    </div>
                     {user.perms?.permTeam && (
-                      <button onClick={() => setAddingMember(true)} style={{ marginLeft: 'auto', padding: '9px 16px', border: 'none', borderRadius: '9px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>+ Add member</button>
+                      <button onClick={() => setAddingMember(true)} style={{ padding: '9px 16px', border: 'none', borderRadius: '9px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>+ Add member</button>
                     )}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                    {teamMembers.map(m => (
-                      <div key={m.id} style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '46px', height: '46px', borderRadius: '13px', background: m.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '16px', flex: 'none' }}>{m.initials}</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                              <span style={{ fontSize: '15px', fontWeight: 700 }}>{m.name}</span>
-                              <span style={{ fontSize: '10px', fontWeight: 700, color: m.roleColor, background: m.roleBg, padding: '2px 7px', borderRadius: '5px' }}>{m.roleLabel}</span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#8a8a94' }}>{m.title}</div>
-                          </div>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#9a9aa4', marginTop: '12px' }}>{m.email}</div>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                          <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800 }}>{m.total}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Total</div></div>
-                          <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800, color: '#d97706' }}>{m.active}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Active</div></div>
-                          <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800, color: '#059669' }}>{m.done}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Done</div></div>
-                        </div>
-                        <div style={{ marginTop: '14px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#8a8a94', marginBottom: '5px' }}><span>Completion</span><span style={{ fontWeight: 700, color: '#16161a' }}>{m.pct}%</span></div>
-                          <div style={{ height: '7px', background: '#eef0f3', borderRadius: '6px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${m.pct}%`, background: settings.accent }}></div></div>
-                        </div>
+                    {filteredMembers.length === 0 ? (
+                      <div style={{ gridColumn: 'span 3', background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '48px', textAlign: 'center', color: '#8a8a94', fontWeight: 600 }}>
+                        No members found matching your search.
                       </div>
-                    ))}
+                    ) : (
+                      filteredMembers.map(m => (
+                        <div key={m.id} style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '46px', height: '46px', borderRadius: '13px', background: m.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '16px', flex: 'none' }}>{m.initials}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '15px', fontWeight: 700 }}>{m.name}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: m.roleColor, background: m.roleBg, padding: '2px 7px', borderRadius: '5px' }}>{m.roleLabel}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: m.isActive ? '#059669' : '#dc2626', background: m.isActive ? '#e6f4ea' : '#fce8e6', padding: '2px 7px', borderRadius: '5px' }}>{m.isActive ? 'Active' : 'Inactive'}</span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#8a8a94' }}>{m.title}</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#9a9aa4', marginTop: '12px' }}>{m.email}</div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                            <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800 }}>{m.total}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Total</div></div>
+                            <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800, color: '#d97706' }}>{m.active}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Active</div></div>
+                            <div style={{ flex: 1, background: '#f7f7fa', borderRadius: '9px', padding: '10px', textAlign: 'center' }}><div style={{ fontSize: '18px', fontWeight: 800, color: '#059669' }}>{m.done}</div><div style={{ fontSize: '10.5px', color: '#8a8a94', fontWeight: 600 }}>Done</div></div>
+                          </div>
+                          <div style={{ marginTop: '14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#8a8a94', marginBottom: '5px' }}><span>Completion</span><span style={{ fontWeight: 700, color: '#16161a' }}>{m.pct}%</span></div>
+                            <div style={{ height: '7px', background: '#eef0f3', borderRadius: '6px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${m.pct}%`, background: settings.accent }}></div></div>
+                          </div>
+                          {user.perms?.permTeam && (
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', borderTop: '1px solid #ececf1', paddingTop: '14px', justifyContent: 'flex-end' }}>
+                              <button onClick={() => handleOpenEditMember(m)} style={{ padding: '6px 12px', border: '1px solid #e1e1e8', borderRadius: '6px', background: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#44444e' }}>Edit</button>
+                              <button onClick={() => handleDeleteMember(m.id)} style={{ padding: '6px 12px', border: '1px solid #fee2e2', borderRadius: '6px', background: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#dc2626' }}>Delete</button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </>
               )}
@@ -1183,7 +1526,7 @@ export default function App() {
                       </div>
                       <div>
                         <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Deadline</label>
-                        <input type="date" value={taskForm.due} onChange={e => setTaskForm({ ...taskForm, due: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '10px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }} required />
+                        <input type="datetime-local" value={taskForm.due} onChange={e => setTaskForm({ ...taskForm, due: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '10px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }} required />
                       </div>
                     </div>
 
@@ -1281,6 +1624,41 @@ export default function App() {
                       )}
                     </div>                   </div>
                   </div>
+                </div>
+              )}
+
+              {/* PROFILE VIEW */}
+              {view === 'profile' && (
+                <div style={{ maxWidth: '640px' }}>
+                  <form onSubmit={handleUpdateProfile} style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '16px', padding: '28px' }}>
+                    <div style={{ fontSize: '17px', fontWeight: 800, marginBottom: '4px' }}>My Profile Settings</div>
+                    <div style={{ fontSize: '13px', color: '#8a8a94', marginBottom: '22px' }}>Update your personal workspace settings and credentials.</div>
+
+                    {profileMessage && (
+                      <div style={{ marginBottom: '16px', padding: '10px 12px', background: profileMessage.type === 'success' ? '#e6f4ea' : '#fef2f2', border: `1px solid ${profileMessage.type === 'success' ? '#34a853' : '#fee2e2'}`, borderRadius: '10px', color: profileMessage.type === 'success' ? '#137333' : '#dc2626', fontSize: '13.5px', fontWeight: 600 }}>
+                        {profileMessage.text}
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Full Name</label>
+                      <input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} required />
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Email Address</label>
+                      <input type="email" value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} required />
+                    </div>
+
+                    <div style={{ marginBottom: '22px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>New Password (leave empty to keep current)</label>
+                      <input type="password" value={profileForm.password} onChange={e => setProfileForm({ ...profileForm, password: e.target.value })} placeholder="••••••••" style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid #f2f2f5', paddingTop: '20px' }}>
+                      <button type="submit" style={{ padding: '11px 24px', border: 'none', borderRadius: '10px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Save Profile</button>
+                    </div>
+                  </form>
                 </div>
               )}
 
@@ -1483,6 +1861,116 @@ export default function App() {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '22px' }}>
               <button type="button" onClick={() => setAddingRole(false)} style={{ padding: '11px 18px', border: '1px solid #e1e1e8', borderRadius: '10px', background: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Cancel</button>
               <button type="submit" style={{ padding: '11px 22px', border: 'none', borderRadius: '10px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Create role</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ============ EDIT TASK MODAL ============ */}
+      {editingTask && (
+        <div onClick={() => setEditingTask(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', zIndex: 60, animation: 'tf-overlay .15s ease' }}>
+          <form onSubmit={handleUpdateTask} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '580px', background: '#fff', borderRadius: '18px', padding: '26px', animation: 'tf-pop .2s ease' }}>
+            <div style={{ fontSize: '18px', fontWeight: 800 }}>Edit Task</div>
+            <div style={{ fontSize: '13px', color: '#8a8a94', marginTop: '4px', marginBottom: '20px' }}>Modify the task details below.</div>
+            
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Title</label>
+              <input value={editTaskForm.title} onChange={e => setEditTaskForm({ ...editTaskForm, title: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} required />
+            </div>
+            
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Description</label>
+              <textarea value={editTaskForm.desc} onChange={e => setEditTaskForm({ ...editTaskForm, desc: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', minHeight: '96px', resize: 'vertical' }}></textarea>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Assign to</label>
+                <select value={editTaskForm.assigneeId} onChange={e => setEditTaskForm({ ...editTaskForm, assigneeId: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }}>
+                  <option value="">Unassigned</option>
+                  {members.map(o => (
+                    <option key={o.id} value={o.id}>{o.name} · {o.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Priority</label>
+                <select value={editTaskForm.priority} onChange={e => setEditTaskForm({ ...editTaskForm, priority: e.target.value as any })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '22px' }}>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Project</label>
+                <select value={editTaskForm.tag} onChange={e => setEditTaskForm({ ...editTaskForm, tag: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }}>
+                  <option value="Web Portal">Web Portal</option>
+                  <option value="Mobile App">Mobile App</option>
+                  <option value="Backend API">Backend API</option>
+                  <option value="DevOps">DevOps</option>
+                  <option value="QA">QA</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Deadline</label>
+                <input type="datetime-local" value={editTaskForm.due} onChange={e => setEditTaskForm({ ...editTaskForm, due: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '10px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }} required />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setEditingTask(null)} style={{ padding: '11px 18px', border: '1px solid #e1e1e8', borderRadius: '10px', background: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Cancel</button>
+              <button type="submit" style={{ padding: '11px 22px', border: 'none', borderRadius: '10px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Save Changes</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ============ EDIT MEMBER MODAL ============ */}
+      {editingMember && (
+        <div onClick={() => setEditingMember(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,26,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', zIndex: 60, animation: 'tf-overlay .15s ease' }}>
+          <form onSubmit={handleUpdateMember} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '460px', background: '#fff', borderRadius: '18px', padding: '26px', animation: 'tf-pop .2s ease' }}>
+            <div style={{ fontSize: '18px', fontWeight: 800 }}>Edit team member</div>
+            <div style={{ fontSize: '13px', color: '#8a8a94', marginTop: '4px', marginBottom: '20px' }}>Update profile, role, and system status.</div>
+            
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Full name</label>
+              <input value={editMemberForm.name} onChange={e => setEditMemberForm({ ...editMemberForm, name: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} required />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Email</label>
+              <input type="email" value={editMemberForm.email} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} required />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>New Password (leave empty to keep current)</label>
+              <input type="password" value={editMemberForm.password} onChange={e => setEditMemberForm({ ...editMemberForm, password: e.target.value })} placeholder="••••••••" style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '22px' }}>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Job title</label>
+                <input value={editMemberForm.title} onChange={e => setEditMemberForm({ ...editMemberForm, title: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Role</label>
+                <select value={editMemberForm.roleId} onChange={e => setEditMemberForm({ ...editMemberForm, roleId: e.target.value })} style={{ width: '100%', marginTop: '7px', padding: '11px 13px', border: '1px solid #e1e1e8', borderRadius: '10px', fontSize: '14px', background: '#fff' }}>
+                  {roles.map(o => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+              <input type="checkbox" id="isActive" checked={editMemberForm.isActive} onChange={e => setEditMemberForm({ ...editMemberForm, isActive: e.target.checked })} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: settings.accent }} />
+              <label htmlFor="isActive" style={{ fontSize: '13px', fontWeight: 700, color: '#44444e', cursor: 'pointer' }}>Active Member (uncheck to deactivate)</label>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setEditingMember(null)} style={{ padding: '11px 18px', border: '1px solid #e1e1e8', borderRadius: '10px', background: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Cancel</button>
+              <button type="submit" style={{ padding: '11px 22px', border: 'none', borderRadius: '10px', background: settings.accent, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>Save Changes</button>
             </div>
           </form>
         </div>

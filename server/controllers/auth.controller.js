@@ -40,6 +40,10 @@ async function login(req, res) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    if (user.isActive === false) {
+      return res.status(403).json({ error: 'Your account is inactive. Please contact your administrator.' });
+    }
+
     const validPassword = await bcrypt.compare(password, user.passwordHash);
     if (!validPassword) {
       return res.status(400).json({ error: 'Invalid email or password' });
@@ -101,8 +105,57 @@ async function getProfile(req, res) {
   }
 }
 
+// 4. SECURE: Update personal user profile
+async function updateProfile(req, res) {
+  const { name, email, password } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const data = {};
+    if (name !== undefined && name.trim() !== '') data.name = name;
+    if (email !== undefined && email.trim() !== '') {
+      const exists = await prisma.user.findUnique({ where: { email } });
+      if (exists && exists.id !== userId) {
+        return res.status(400).json({ error: 'User with this email already exists' });
+      }
+      data.email = email;
+    }
+    if (password !== undefined && password.trim() !== '') {
+      data.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data,
+      include: { role: true }
+    });
+
+    res.json({
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.roleId,
+      title: updated.title,
+      color: updated.color,
+      perms: updated.role ? updated.role : {}
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+}
+
 module.exports = {
   getAccounts,
   login,
-  getProfile
+  getProfile,
+  updateProfile
 };

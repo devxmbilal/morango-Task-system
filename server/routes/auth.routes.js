@@ -9,5 +9,6 @@ router.post('/auth/login', authController.login);
 
 // Secure profile endpoint
 router.get('/auth/me', authenticateToken, authController.getProfile);
+router.put('/auth/me', authenticateToken, authController.updateProfile);
 
 module.exports = router;

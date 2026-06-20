@@ -42,9 +42,9 @@ async function getTasks(req, res) {
       status: t.status,
       priority: t.priority,
       tag: t.tag,
-      created: t.createdDate.toISOString().slice(0, 10),
-      start: t.startDate ? t.startDate.toISOString().slice(0, 10) : '',
-      due: t.dueDate.toISOString().slice(0, 10),
+      created: t.createdDate.toISOString(),
+      start: t.startDate ? t.startDate.toISOString() : '',
+      due: t.dueDate.toISOString(),
       progress: t.progress,
       images: t.attachments.map(att => att.fileUrl),
       comments: t.comments.map(c => ({
@@ -92,7 +92,8 @@ async function createTask(req, res) {
         priority: priority || 'medium',
         tag: tag || 'Web Portal',
         dueDate: new Date(due),
-        createdDate: new Date()
+        createdDate: new Date(),
+        startDate: assigneeId ? new Date() : null
       }
     });
 
@@ -143,9 +144,9 @@ async function createTask(req, res) {
       status: created.status,
       priority: created.priority,
       tag: created.tag,
-      created: created.createdDate.toISOString().slice(0, 10),
-      start: created.startDate ? created.startDate.toISOString().slice(0, 10) : '',
-      due: created.dueDate.toISOString().slice(0, 10),
+      created: created.createdDate.toISOString(),
+      start: created.startDate ? created.startDate.toISOString() : '',
+      due: created.dueDate.toISOString(),
       progress: created.progress,
       images: created.attachments.map(att => att.fileUrl),
       comments: []
@@ -184,7 +185,12 @@ async function updateTask(req, res) {
     }
     if (title !== undefined) data.title = title;
     if (desc !== undefined) data.description = desc;
-    if (assigneeId !== undefined) data.assigneeId = assigneeId || null;
+    if (assigneeId !== undefined) {
+      data.assigneeId = assigneeId || null;
+      if ((assigneeId || null) !== task.assigneeId) {
+        data.startDate = assigneeId ? new Date() : null;
+      }
+    }
     if (priority !== undefined) data.priority = priority;
     if (tag !== undefined) data.tag = tag;
     if (due !== undefined) data.dueDate = new Date(due);
@@ -233,9 +239,9 @@ async function updateTask(req, res) {
       status: updated.status,
       priority: updated.priority,
       tag: updated.tag,
-      created: updated.createdDate.toISOString().slice(0, 10),
-      start: updated.startDate ? updated.startDate.toISOString().slice(0, 10) : '',
-      due: updated.dueDate.toISOString().slice(0, 10),
+      created: updated.createdDate.toISOString(),
+      start: updated.startDate ? updated.startDate.toISOString() : '',
+      due: updated.dueDate.toISOString(),
       progress: updated.progress,
       images: updated.attachments.map(att => att.fileUrl),
       comments: updated.comments.map(c => ({
@@ -290,10 +296,35 @@ function uploadAttachment(req, res) {
   res.json({ fileUrl });
 }
 
+// 6. SECURE: Delete task
+async function deleteTask(req, res) {
+  const { id } = req.params;
+
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id }
+    });
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    await prisma.task.delete({
+      where: { id }
+    });
+
+    res.json({ success: true, message: 'Task deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete task' });
+  }
+}
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   addComment,
-  uploadAttachment
+  uploadAttachment,
+  deleteTask
 };
