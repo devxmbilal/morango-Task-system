@@ -70,10 +70,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#fff',
-            fontSize: '14px',
           }}
         >
-          ◆
+          <svg width="18" height="18" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2.5C16 2.5 25.5 8 25.5 15.5C25.5 21 21.5 26.5 16 29.5C10.5 26.5 6.5 21 6.5 15.5C6.5 8 16 2.5 16 2.5Z" fill="#ffffff" />
+            <circle cx="16" cy="10" r="1.8" fill={settings.accent} />
+            <circle cx="11" cy="16.5" r="1.8" fill={settings.accent} />
+            <circle cx="21" cy="16.5" r="1.8" fill={settings.accent} />
+            <circle cx="16" cy="23" r="1.8" fill={settings.accent} />
+          </svg>
         </div>
         {settings.companyName}
 
