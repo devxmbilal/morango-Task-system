@@ -119,6 +119,7 @@ export function useTasks() {
       tag: string;
       due: string;
       referenceLinks?: string[];
+      images?: string[];
     }
   ) => {
     try {

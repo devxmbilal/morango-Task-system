@@ -189,6 +189,7 @@ export default function App() {
     tag: 'Web Portal',
     due: '',
     referenceLinks: [] as string[],
+    images: [] as string[],
   });
 
   // ─── Edit Member Modal ───
@@ -441,6 +442,7 @@ export default function App() {
       tag: task.tag,
       due: toLocalDatetimeString(task.due),
       referenceLinks: task.referenceLinks ? [...task.referenceLinks] : [],
+      images: task.images ? [...task.images] : [],
     });
   };
 

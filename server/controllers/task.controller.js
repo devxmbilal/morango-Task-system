@@ -193,7 +193,7 @@ async function createTask(req, res) {
 // 3. SECURE: Update task
 async function updateTask(req, res) {
   const { id } = req.params;
-  const { status, progress, title, desc, assigneeId, priority, tag, due, referenceLinks } = req.body;
+  const { status, progress, title, desc, assigneeId, priority, tag, due, referenceLinks, images } = req.body;
 
   try {
     const task = await prisma.task.findUnique({
@@ -267,6 +267,18 @@ async function updateTask(req, res) {
           }
         })
         .catch(err => console.error('Error sending assignment email:', err));
+    }
+
+    // If `images` array provided, replace task attachments wholesale.
+    // (Array of URL strings — same shape getTasks returns.)
+    if (Array.isArray(images)) {
+      await prisma.attachment.deleteMany({ where: { taskId: id } });
+      const fresh = images.filter(u => typeof u === 'string' && u);
+      if (fresh.length > 0) {
+        await prisma.attachment.createMany({
+          data: fresh.map(fileUrl => ({ taskId: id, fileUrl }))
+        });
+      }
     }
 
     const updated = await prisma.task.update({

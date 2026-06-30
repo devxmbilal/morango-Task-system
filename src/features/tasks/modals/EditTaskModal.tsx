@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { Task, WorkspaceSettings } from '../../../types';
+import { api } from '../../../lib/api';
+import { toastError, toastSuccess } from '../../../lib/toast';
 
 export interface EditTaskFormShape {
   title: string;
@@ -9,6 +11,7 @@ export interface EditTaskFormShape {
   tag: string;
   due: string;
   referenceLinks: string[];
+  images: string[];
 }
 
 interface EditTaskModalProps {
@@ -30,6 +33,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   onClose,
 }) => {
   const [refLinkInput, setRefLinkInput] = useState('');
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const addRefLink = () => {
     const v = refLinkInput.trim();
@@ -39,6 +43,37 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   };
   const removeRefLink = (i: number) =>
     onFormChange({ ...editTaskForm, referenceLinks: editTaskForm.referenceLinks.filter((_, idx) => idx !== i) });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    setUploadingCount(c => c + files.length);
+    // Accumulate new URLs locally so sequential uploads don't overwrite each other
+    // via stale closures over editTaskForm.
+    const newlyUploaded: string[] = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const data = await api.upload('/upload', formData);
+        newlyUploaded.push(data.fileUrl);
+        toastSuccess(`${file.name} uploaded`);
+      } catch (err: any) {
+        toastError(err.message || 'Upload failed');
+      } finally {
+        setUploadingCount(c => c - 1);
+      }
+    }
+    if (newlyUploaded.length > 0) {
+      onFormChange({ ...editTaskForm, images: [...editTaskForm.images, ...newlyUploaded] });
+    }
+  };
+
+  const removeImage = (i: number) =>
+    onFormChange({ ...editTaskForm, images: editTaskForm.images.filter((_, idx) => idx !== i) });
+
+  const isImage = (url: string) => /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?|$)/i.test(url);
 
   return (
     <div
@@ -210,6 +245,52 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
         </div>
 
+        {/* Attachments */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Attachments</label>
+          <label
+            style={{
+              marginTop: 7, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 6,
+              border: '1.5px dashed #d4d4dd', borderRadius: 12, padding: 18,
+              cursor: uploadingCount > 0 ? 'wait' : 'pointer',
+              background: '#fafafc', opacity: uploadingCount > 0 ? 0.7 : 1,
+            }}
+            className="btn-hover"
+          >
+            <span style={{ fontSize: 18, color: '#8a8a94' }}>☁</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Click to upload file</span>
+            <span style={{ fontSize: 11.5, color: '#a0a0aa' }}>Images, documents up to 25MB</span>
+            <input type="file" multiple onChange={handleFileUpload} disabled={uploadingCount > 0} style={{ display: 'none' }} />
+          </label>
+
+          {uploadingCount > 0 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '7px 12px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>
+              <span className="upload-spinner" />
+              Uploading {uploadingCount} file{uploadingCount === 1 ? '' : 's'}…
+            </div>
+          )}
+
+          {editTaskForm.images.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+              {editTaskForm.images.map((src, i) => (
+                <div key={i} style={{ position: 'relative', width: 84, height: 84, borderRadius: 10, overflow: 'hidden', border: '1px solid #e6e6ec', background: '#fff' }}>
+                  {isImage(src) ? (
+                    <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                  ) : (
+                    <a href={src} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', textDecoration: 'none', color: '#4f46e5', fontSize: 11, fontWeight: 700, padding: 6, textAlign: 'center', wordBreak: 'break-all' }}>
+                      📎 file
+                    </a>
+                  )}
+                  <button type="button" onClick={() => removeImage(i)}
+                    style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 6, border: 'none', background: 'rgba(0,0,0,.6)', color: '#fff', cursor: 'pointer', fontSize: 12 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Reference Links */}
         <div style={{ marginBottom: 22 }}>
           <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Reference links</label>
@@ -267,6 +348,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </button>
           <button
             type="submit"
+            disabled={uploadingCount > 0}
             style={{
               padding: '11px 22px',
               border: 'none',
@@ -275,10 +357,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               color: '#fff',
               fontWeight: 700,
               fontSize: '13.5px',
-              cursor: 'pointer',
+              cursor: uploadingCount > 0 ? 'wait' : 'pointer',
+              opacity: uploadingCount > 0 ? 0.6 : 1,
             }}
           >
-            Save Changes
+            {uploadingCount > 0 ? 'Uploading…' : 'Save Changes'}
           </button>
         </div>
       </form>
