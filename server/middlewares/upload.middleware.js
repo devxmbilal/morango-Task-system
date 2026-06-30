@@ -15,6 +15,10 @@ const useCloudinary = isConfigured();
 
 let storage;
 if (useCloudinary) {
+  console.log(
+    '[upload] Cloudinary configured via',
+    process.env.CLOUDINARY_URL ? 'CLOUDINARY_URL' : 'CLOUDINARY_CLOUD_NAME/_API_KEY/_API_SECRET'
+  );
   storage = new CloudinaryStorage({
     cloudinary,
     params: async (req, file) => {
@@ -46,7 +50,17 @@ if (useCloudinary) {
     filename: (req, file, cb) =>
       cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
   });
-  console.warn('[upload] CLOUDINARY_URL not set — falling back to local disk. Files will not persist on stateless hosts.');
+  const missing = [];
+  if (!process.env.CLOUDINARY_URL) missing.push('CLOUDINARY_URL');
+  if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
+  if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
+  if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
+  console.warn(
+    '[upload] Cloudinary NOT configured — falling back to local disk.\n' +
+    '          Missing env vars: ' + missing.join(', ') + '\n' +
+    '          .env loaded from cwd: ' + process.cwd() + '\n' +
+    '          Restart the server after editing .env (nodemon does not auto-reload it).'
+  );
 }
 
 const upload = multer({

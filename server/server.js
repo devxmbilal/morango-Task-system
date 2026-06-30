@@ -1,9 +1,10 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { uploadDir } = require('./middlewares/upload.middleware');
 const apiRoutes = require('./routes/index');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
