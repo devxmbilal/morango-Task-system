@@ -113,6 +113,7 @@ export default function App() {
     updateMilestone,
     deleteMilestone,
     submitWork,
+    submitTask,
     editSubmission,
     reviewSubmission,
     pendingReviews,
@@ -168,6 +169,14 @@ export default function App() {
     tag: 'Web Portal',
     due: '2026-06-30T18:00',
     images: [] as string[],
+    referenceLinks: [] as string[],
+    milestones: [] as Array<{
+      title: string;
+      description: string;
+      dueDate: string;
+      links: string[];
+      attachments: { id: number; fileUrl: string; fileName: string }[];
+    }>,
   });
 
   // ─── Edit Task Modal ───
@@ -179,6 +188,7 @@ export default function App() {
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     tag: 'Web Portal',
     due: '',
+    referenceLinks: [] as string[],
   });
 
   // ─── Edit Member Modal ───
@@ -206,6 +216,7 @@ export default function App() {
   const [milestoneFormOpen, setMilestoneFormOpen] = useState<boolean>(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [submitWorkFor, setSubmitWorkFor] = useState<{ milestone: Milestone; submission: Submission | null } | null>(null);
+  const [submitTaskFor, setSubmitTaskFor] = useState<Task | null>(null);
   const [reviewingSubmission, setReviewingSubmission] = useState<{ submission: Submission; milestone: Milestone } | null>(null);
 
   // ─── Refs ───
@@ -334,13 +345,17 @@ export default function App() {
     await markNotificationsRead();
   };
 
-  const handleNotificationClick = (n: typeof notifications[number]) => {
-    if (n.taskId) {
-      setSearchQuery('');
-      setSelectedId(n.taskId);
-      setShowNotifications(false);
-    }
+  const handleNotificationClick = async (n: typeof notifications[number]) => {
     if (!n.read) markOneRead(n.id);
+    if (!n.taskId) return;
+
+    setSearchQuery('');
+    setShowNotifications(false);
+
+    // Make sure local task cache contains this task — non-admins only fetch
+    // their own assignments, so a freshly assigned task may not be in cache yet.
+    await fetchTasks();
+    setSelectedId(n.taskId);
   };
 
   const handleMoveTask = async (taskId: string, status: string) => {
@@ -386,6 +401,8 @@ export default function App() {
         tag: 'Web Portal',
         due: '2026-06-30T18:00',
         images: [],
+        referenceLinks: [],
+        milestones: [],
       });
     }
   };
@@ -415,6 +432,7 @@ export default function App() {
       priority: task.priority,
       tag: task.tag,
       due: toLocalDatetimeString(task.due),
+      referenceLinks: task.referenceLinks ? [...task.referenceLinks] : [],
     });
   };
 
@@ -537,6 +555,19 @@ export default function App() {
 
   const handleOpenSubmitWork = (m: Milestone) =>
     setSubmitWorkFor({ milestone: m, submission: null });
+
+  const handleOpenSubmitTask = (t: Task) => setSubmitTaskFor(t);
+
+  const handleSubmitTaskDirect = async (data: { description: string; links: string[]; attachments: any[] }) => {
+    if (!submitTaskFor) return { ok: false };
+    const res = await submitTask(submitTaskFor.id, data);
+    if (res.ok && selectedId) {
+      fetchMilestones(selectedId);
+      fetchTasks();
+      fetchNotifications();
+    }
+    return res;
+  };
 
   const handleOpenEditSubmission = (s: Submission, m: Milestone) =>
     setSubmitWorkFor({ milestone: m, submission: s });
@@ -818,7 +849,6 @@ export default function App() {
           commentDraft={commentDraft}
           milestones={milestones}
           onClose={() => setSelectedId(null)}
-          onMoveTask={handleMoveTask}
           onSetProgress={handleSetProgress}
           onCommentChange={setCommentDraft}
           onPostComment={handlePostComment}
@@ -829,6 +859,15 @@ export default function App() {
           onEditSubmission={handleOpenEditSubmission}
           onReviewSubmission={handleOpenReview}
           onAcceptTask={handleAcceptTask}
+          onSubmitTaskDirect={handleOpenSubmitTask}
+        />
+      )}
+      {submitTaskFor && (
+        <SubmitWorkModal
+          milestone={{ title: `Submit task: ${submitTaskFor.title}` }}
+          settings={settings}
+          onClose={() => setSubmitTaskFor(null)}
+          onSubmit={handleSubmitTaskDirect}
         />
       )}
       {milestoneFormOpen && (

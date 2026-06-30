@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Milestone, PendingReview, SubmissionAttachment } from '../types';
+import type { Milestone, MilestoneAttachment, PendingReview, SubmissionAttachment } from '../types';
 import { api } from '../lib/api';
 import { toastSuccess, toastError } from '../lib/toast';
 
@@ -34,30 +34,30 @@ export function useMilestones() {
 
   const createMilestone = async (
     taskId: string,
-    form: { title: string; description: string; dueDate?: string }
+    form: { title: string; description: string; dueDate?: string; links?: string[]; attachments?: MilestoneAttachment[] }
   ) => {
     try {
       const created: Milestone = await api.post(`/tasks/${taskId}/milestones`, form);
       setMilestones(prev => [...prev, created].sort((a, b) => a.order - b.order));
-      toastSuccess('Milestone added');
+      toastSuccess('Sub-task added');
       return { ok: true, milestone: created };
     } catch (e: any) {
-      toastError(e.message || 'Failed to create milestone');
+      toastError(e.message || 'Failed to create sub-task');
       return { ok: false };
     }
   };
 
   const updateMilestone = async (
     id: number,
-    form: { title?: string; description?: string; dueDate?: string }
+    form: { title?: string; description?: string; dueDate?: string; links?: string[]; attachments?: MilestoneAttachment[] }
   ) => {
     try {
       const updated: Milestone = await api.put(`/milestones/${id}`, form);
       setMilestones(prev => prev.map(m => (m.id === id ? updated : m)));
-      toastSuccess('Milestone updated');
+      toastSuccess('Sub-task updated');
       return { ok: true };
     } catch (e: any) {
-      toastError(e.message || 'Failed to update milestone');
+      toastError(e.message || 'Failed to update sub-task');
       return { ok: false };
     }
   };
@@ -66,10 +66,10 @@ export function useMilestones() {
     try {
       await api.delete(`/milestones/${id}`);
       setMilestones(prev => prev.filter(m => m.id !== id));
-      toastSuccess('Milestone deleted');
+      toastSuccess('Sub-task deleted');
       return { ok: true };
     } catch (e: any) {
-      toastError(e.message || 'Failed to delete milestone');
+      toastError(e.message || 'Failed to delete sub-task');
       return { ok: false };
     }
   };
@@ -84,6 +84,20 @@ export function useMilestones() {
       return { ok: true };
     } catch (e: any) {
       toastError(e.message || 'Failed to submit work');
+      return { ok: false };
+    }
+  };
+
+  const submitTask = async (
+    taskId: string,
+    form: { description: string; links: string[]; attachments: SubmissionAttachment[] }
+  ) => {
+    try {
+      await api.post(`/tasks/${taskId}/submit`, form);
+      toastSuccess('Task submitted for review');
+      return { ok: true };
+    } catch (e: any) {
+      toastError(e.message || 'Failed to submit task');
       return { ok: false };
     }
   };
@@ -127,6 +141,7 @@ export function useMilestones() {
     updateMilestone,
     deleteMilestone,
     submitWork,
+    submitTask,
     editSubmission,
     reviewSubmission,
     pendingReviews,

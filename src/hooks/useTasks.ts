@@ -1,7 +1,25 @@
 import { useState, useCallback } from 'react';
-import type { Task } from '../types';
+import type { MilestoneAttachment, Task } from '../types';
 import { api } from '../lib/api';
 import { toastSuccess, toastError } from '../lib/toast';
+
+interface CreateTaskInput {
+  title: string;
+  desc: string;
+  assigneeId: string;
+  priority: string;
+  tag: string;
+  due: string;
+  images: string[];
+  referenceLinks?: string[];
+  milestones?: Array<{
+    title: string;
+    description: string;
+    dueDate?: string;
+    links: string[];
+    attachments: MilestoneAttachment[];
+  }>;
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -67,15 +85,7 @@ export function useTasks() {
     }
   };
 
-  const createTask = async (taskForm: {
-    title: string;
-    desc: string;
-    assigneeId: string;
-    priority: string;
-    tag: string;
-    due: string;
-    images: string[];
-  }) => {
+  const createTask = async (taskForm: CreateTaskInput) => {
     try {
       await api.post('/tasks', taskForm);
       fetchTasks();
@@ -108,6 +118,7 @@ export function useTasks() {
       priority: string;
       tag: string;
       due: string;
+      referenceLinks?: string[];
     }
   ) => {
     try {

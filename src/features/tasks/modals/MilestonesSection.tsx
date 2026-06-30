@@ -59,7 +59,7 @@ const MilestonesSection: React.FC<Props> = ({
     <div style={{ borderTop: '1px solid #f2f2f5', paddingTop: 22, marginTop: 22 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44444e' }}>
-          Milestones ({milestones.length})
+          Sub-tasks ({milestones.length})
         </div>
         {isAdmin && (
           <button
@@ -67,14 +67,14 @@ const MilestonesSection: React.FC<Props> = ({
             onClick={onAddMilestone}
             style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 11.5, fontWeight: 700, border: '1px solid #e1e1e8', background: '#fff', borderRadius: 8, cursor: 'pointer', color: '#4f46e5' }}
           >
-            + Add Milestone
+            + Add Sub-task
           </button>
         )}
       </div>
 
       {milestones.length === 0 && (
         <div style={{ padding: 16, background: '#f9f9fb', borderRadius: 10, fontSize: 12.5, color: '#8a8a94', textAlign: 'center' }}>
-          No milestones yet.{isAdmin ? ' Click "Add Milestone" to break this task into reviewable deliverables.' : ''}
+          No sub-tasks yet.{isAdmin ? ' Click "Add Sub-task" to break this task into reviewable deliverables.' : ''}
         </div>
       )}
 
@@ -110,6 +110,26 @@ const MilestonesSection: React.FC<Props> = ({
                   {m.description && (
                     <div style={{ fontSize: 12.5, color: '#55555e', marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                       {m.description}
+                    </div>
+                  )}
+                  {(m.links.length > 0 || m.attachments.length > 0) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                      {m.links.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {m.links.map((l, i) => (
+                            <a key={i} href={l} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: '#4f46e5', wordBreak: 'break-all' }}>🔗 {l}</a>
+                          ))}
+                        </div>
+                      )}
+                      {m.attachments.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {m.attachments.map(a => (
+                            <a key={a.id} href={a.fileUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 10px', background: '#f6f7f9', border: '1px solid #e1e1e8', borderRadius: 6, fontSize: 11.5, color: '#4f46e5', textDecoration: 'none', fontWeight: 600 }}>
+                              📎 {a.fileName || 'file'}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

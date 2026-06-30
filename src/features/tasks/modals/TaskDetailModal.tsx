@@ -11,7 +11,6 @@ interface TaskDetailModalProps {
   commentDraft: string;
   milestones: Milestone[];
   onClose: () => void;
-  onMoveTask: (id: string, status: string) => void;
   onSetProgress: (id: string, p: number) => void;
   onCommentChange: (v: string) => void;
   onPostComment: () => void;
@@ -22,6 +21,7 @@ interface TaskDetailModalProps {
   onEditSubmission: (s: Submission, m: Milestone) => void;
   onReviewSubmission: (s: Submission, m: Milestone) => void;
   onAcceptTask: (taskId: string) => void;
+  onSubmitTaskDirect: (task: Task) => void;
 }
 
 const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
@@ -32,7 +32,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   commentDraft,
   milestones,
   onClose,
-  onMoveTask,
   onSetProgress,
   onCommentChange,
   onPostComment,
@@ -43,9 +42,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onEditSubmission,
   onReviewSubmission,
   onAcceptTask,
+  onSubmitTaskDirect,
 }) => {
   const isAssignee = user.id === task.assigneeId;
   const needsAcceptance = isAssignee && !task.acceptedAt;
+  const canSubmitDirectly = isAssignee && !!task.acceptedAt && milestones.length === 0;
   const getUserById = (id: string) => members.find(m => m.id === id);
   const assigneeUser = getUserById(task.assigneeId);
   const taskPriorityMeta = getPriorityMeta(task.priority);
@@ -213,41 +214,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
             )}
 
-            {/* Status Buttons */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
-              {(['todo', 'inprogress', 'done'] as const).map(s => {
-                const active = task.status === s;
-                const colors: Record<string, string> = {
-                  todo: '#64748b',
-                  inprogress: '#f59e0b',
-                  done: '#10b981',
-                };
-                const labels: Record<string, string> = {
-                  todo: 'To Do',
-                  inprogress: 'In Progress',
-                  done: 'Done',
-                };
-                return (
-                  <button
-                    key={s}
-                    onClick={() => onMoveTask(task.id, s)}
-                    style={{
-                      flex: 1,
-                      padding: '9px',
-                      borderRadius: '9px',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      border: `1px solid ${active ? colors[s] : '#e1e1e8'}`,
-                      background: active ? colors[s] : '#fff',
-                      color: active ? '#fff' : '#6b6b76',
-                    }}
-                  >
-                    {labels[s]}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Status (read-only — auto-updates with accept and sub-task approvals) */}
+            {(() => {
+              const colors: Record<string, string> = { todo: '#64748b', inprogress: '#f59e0b', done: '#10b981' };
+              const labels: Record<string, string> = { todo: 'To Do', inprogress: 'In Progress', done: 'Done' };
+              const c = colors[task.status] || '#64748b';
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#8a8a94', textTransform: 'uppercase', letterSpacing: '.04em' }}>Status</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: c, background: `color-mix(in srgb, ${c} 14%, #fff)`, padding: '4px 12px', borderRadius: 20, border: `1px solid color-mix(in srgb, ${c} 25%, #fff)` }}>
+                    {labels[task.status] || task.status}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: '#a0a0aa', marginLeft: 'auto' }}>auto</span>
+                </div>
+              );
+            })()}
 
             {/* Description */}
             <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '7px' }}>
@@ -258,12 +239,23 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 fontSize: '13.5px',
                 color: '#55555e',
                 lineHeight: 1.65,
-                marginBottom: '22px',
+                marginBottom: '14px',
                 whiteSpace: 'pre-wrap',
               }}
             >
               {task.desc}
             </div>
+
+            {task.referenceLinks && task.referenceLinks.length > 0 && (
+              <>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '7px' }}>Reference links</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 22 }}>
+                  {task.referenceLinks.map((l, i) => (
+                    <a key={i} href={l} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: '#4f46e5', wordBreak: 'break-all' }}>🔗 {l}</a>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Progress (milestone-driven when milestones exist) */}
             {(() => {
@@ -326,6 +318,30 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   ))}
                 </div>
               </>
+            )}
+
+            {/* Direct task submission (only when no sub-tasks exist yet) */}
+            {canSubmitDirectly && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe',
+                borderRadius: 10, marginBottom: 8,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#5b21b6' }}>Ready to submit this task?</div>
+                  <div style={{ fontSize: 11.5, color: '#6d28d9', marginTop: 2 }}>Send your work to the admin for review.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSubmitTaskDirect(task)}
+                  style={{
+                    padding: '9px 18px', border: 'none', background: '#7c3aed', color: '#fff',
+                    borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Submit Task
+                </button>
+              </div>
             )}
 
             {/* Milestones */}

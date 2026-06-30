@@ -1,19 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Task, WorkspaceSettings } from '../../../types';
+
+export interface EditTaskFormShape {
+  title: string;
+  desc: string;
+  assigneeId: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  tag: string;
+  due: string;
+  referenceLinks: string[];
+}
 
 interface EditTaskModalProps {
   task: Task;
   members: any[];
   settings: WorkspaceSettings;
-  editTaskForm: {
-    title: string;
-    desc: string;
-    assigneeId: string;
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    tag: string;
-    due: string;
-  };
-  onFormChange: (form: any) => void;
+  editTaskForm: EditTaskFormShape;
+  onFormChange: (form: EditTaskFormShape) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
 }
@@ -26,6 +29,17 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   onSubmit,
   onClose,
 }) => {
+  const [refLinkInput, setRefLinkInput] = useState('');
+
+  const addRefLink = () => {
+    const v = refLinkInput.trim();
+    if (!v) return;
+    onFormChange({ ...editTaskForm, referenceLinks: [...editTaskForm.referenceLinks, v] });
+    setRefLinkInput('');
+  };
+  const removeRefLink = (i: number) =>
+    onFormChange({ ...editTaskForm, referenceLinks: editTaskForm.referenceLinks.filter((_, idx) => idx !== i) });
+
   return (
     <div
       style={{
@@ -45,6 +59,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '580px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           background: '#fff',
           borderRadius: '18px',
           padding: '26px',
@@ -192,6 +208,44 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               required
             />
           </div>
+        </div>
+
+        {/* Reference Links */}
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Reference links</label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 7 }}>
+            <input
+              type="url"
+              value={refLinkInput}
+              onChange={e => setRefLinkInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRefLink(); } }}
+              placeholder="https://github.com/... or https://figma.com/..."
+              style={{ flex: 1, padding: '10px 13px', border: '1px solid #e1e1e8', borderRadius: 10, fontSize: 13.5 }}
+            />
+            <button
+              type="button"
+              onClick={addRefLink}
+              style={{ padding: '10px 16px', border: '1px solid #e1e1e8', background: '#f6f7f9', borderRadius: 10, cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}
+            >
+              Add
+            </button>
+          </div>
+          {editTaskForm.referenceLinks.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+              {editTaskForm.referenceLinks.map((l, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f6f7f9', borderRadius: 8 }}>
+                  <span style={{ flex: 1, fontSize: 12.5, color: '#4f46e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeRefLink(i)}
+                    style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 14, width: 22, height: 22 }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Actions */}

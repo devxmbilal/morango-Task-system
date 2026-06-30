@@ -55,6 +55,7 @@ model Task {
   dueDate     DateTime     @map("due_date")
   acceptedAt  DateTime?    @map("accepted_at")
   progress    Int          @default(0)
+  referenceLinks String?   @map("reference_links") // JSON-encoded string[]
   comments    Comment[]
   attachments Attachment[]
   milestones  Milestone[]
@@ -71,10 +72,22 @@ model Milestone {
   dueDate     DateTime?    @map("due_date")
   order       Int          @default(0)
   status      String       @default("pending") // "pending", "submitted", "approved", "rejected"
+  links       String?      // JSON-encoded string[]
   createdAt   DateTime     @default(now()) @map("created_at")
   submissions Submission[]
+  attachments MilestoneAttachment[]
 
   @@map("milestones")
+}
+
+model MilestoneAttachment {
+  id          Int       @id @default(autoincrement())
+  milestoneId Int       @map("milestone_id")
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  fileUrl     String    @map("file_url")
+  fileName    String?   @map("file_name")
+
+  @@map("milestone_attachments")
 }
 
 model Submission {

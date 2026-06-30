@@ -54,6 +54,12 @@ function formatMilestone(m) {
     order: m.order,
     status: m.status,
     createdAt: m.createdAt.toISOString(),
+    links: m.links ? JSON.parse(m.links) : [],
+    attachments: (m.attachments || []).map(a => ({
+      id: a.id,
+      fileUrl: a.fileUrl,
+      fileName: a.fileName || ''
+    })),
     submissions: (m.submissions || []).map(formatSubmission)
   };
 }
@@ -66,6 +72,7 @@ async function listMilestones(req, res) {
       where: { taskId },
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
       include: {
+        attachments: true,
         submissions: {
           orderBy: { createdAt: 'desc' },
           include: {
@@ -86,7 +93,7 @@ async function listMilestones(req, res) {
 // POST /tasks/:taskId/milestones  (admin only)
 async function createMilestone(req, res) {
   const { taskId } = req.params;
-  const { title, description, dueDate, order } = req.body;
+  const { title, description, dueDate, order, links, attachments } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Milestone title is required' });
@@ -119,9 +126,18 @@ async function createMilestone(req, res) {
         title: title.trim(),
         description: description || '',
         dueDate: dueDate ? new Date(dueDate) : null,
-        order: nextOrder
+        order: nextOrder,
+        links: Array.isArray(links) && links.length
+          ? JSON.stringify(links.filter(Boolean))
+          : null,
+        attachments: {
+          create: (Array.isArray(attachments) ? attachments : [])
+            .filter(a => a && a.fileUrl)
+            .map(a => ({ fileUrl: a.fileUrl, fileName: a.fileName || '' }))
+        }
       },
       include: {
+        attachments: true,
         submissions: {
           include: { user: true, reviewedBy: true, attachments: true }
         }
@@ -151,7 +167,7 @@ async function createMilestone(req, res) {
 // PUT /milestones/:id  (admin only)
 async function updateMilestone(req, res) {
   const id = parseInt(req.params.id, 10);
-  const { title, description, dueDate, order } = req.body;
+  const { title, description, dueDate, order, links, attachments } = req.body;
   try {
     const reviewer = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -166,11 +182,28 @@ async function updateMilestone(req, res) {
     if (description !== undefined) data.description = description;
     if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if (order !== undefined) data.order = order;
+    if (links !== undefined) {
+      data.links = Array.isArray(links) && links.length
+        ? JSON.stringify(links.filter(Boolean))
+        : null;
+    }
+
+    // If attachments array provided, replace existing ones wholesale
+    if (Array.isArray(attachments)) {
+      await prisma.milestoneAttachment.deleteMany({ where: { milestoneId: id } });
+      const fresh = attachments.filter(a => a && a.fileUrl);
+      if (fresh.length > 0) {
+        await prisma.milestoneAttachment.createMany({
+          data: fresh.map(a => ({ milestoneId: id, fileUrl: a.fileUrl, fileName: a.fileName || '' }))
+        });
+      }
+    }
 
     const updated = await prisma.milestone.update({
       where: { id },
       data,
       include: {
+        attachments: true,
         submissions: {
           orderBy: { createdAt: 'desc' },
           include: { user: true, reviewedBy: true, attachments: true }

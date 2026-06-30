@@ -56,6 +56,7 @@ export interface Task {
   start: string;
   due: string;
   acceptedAt: string;
+  referenceLinks: string[];
   progress: number;
   images: string[];
   comments: Comment[];
@@ -124,6 +125,12 @@ export const SUBMISSION_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 export type MilestoneStatus = 'pending' | 'submitted' | 'approved' | 'rejected';
 
+export interface MilestoneAttachment {
+  id: number;
+  fileUrl: string;
+  fileName: string;
+}
+
 export interface Milestone {
   id: number;
   taskId: string;
@@ -133,5 +140,7 @@ export interface Milestone {
   order: number;
   status: MilestoneStatus;
   createdAt: string;
+  links: string[];
+  attachments: MilestoneAttachment[];
   submissions: Submission[];
 }

@@ -46,6 +46,7 @@ async function getTasks(req, res) {
       start: t.startDate ? t.startDate.toISOString() : '',
       due: t.dueDate.toISOString(),
       acceptedAt: t.acceptedAt ? t.acceptedAt.toISOString() : '',
+      referenceLinks: t.referenceLinks ? JSON.parse(t.referenceLinks) : [],
       progress: t.progress,
       images: t.attachments.map(att => att.fileUrl),
       comments: t.comments.map(c => ({
@@ -65,7 +66,7 @@ async function getTasks(req, res) {
 
 // 2. SECURE: Create task
 async function createTask(req, res) {
-  const { title, desc, assigneeId, priority, tag, due, images } = req.body;
+  const { title, desc, assigneeId, priority, tag, due, images, referenceLinks, milestones } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
@@ -77,7 +78,7 @@ async function createTask(req, res) {
     });
     let taskNum = 100001 + allTasks.length;
     let nextId = `TASK-${taskNum}`;
-    
+
     while (allTasks.some(t => t.id === nextId)) {
       taskNum++;
       nextId = `TASK-${taskNum}`;
@@ -94,9 +95,37 @@ async function createTask(req, res) {
         tag: tag || 'Web Portal',
         dueDate: new Date(due),
         createdDate: new Date(),
-        startDate: assigneeId ? new Date() : null
+        startDate: assigneeId ? new Date() : null,
+        referenceLinks: Array.isArray(referenceLinks) && referenceLinks.length
+          ? JSON.stringify(referenceLinks.filter(Boolean))
+          : null
       }
     });
+
+    // Initial sub-tasks (milestones) provided at creation time
+    if (Array.isArray(milestones)) {
+      let order = 0;
+      for (const m of milestones) {
+        if (!m || !m.title || !m.title.trim()) continue;
+        await prisma.milestone.create({
+          data: {
+            taskId: nextId,
+            title: m.title.trim(),
+            description: m.description || '',
+            dueDate: m.dueDate ? new Date(m.dueDate) : null,
+            order: order++,
+            links: Array.isArray(m.links) && m.links.length
+              ? JSON.stringify(m.links.filter(Boolean))
+              : null,
+            attachments: {
+              create: (Array.isArray(m.attachments) ? m.attachments : [])
+                .filter(a => a && a.fileUrl)
+                .map(a => ({ fileUrl: a.fileUrl, fileName: a.fileName || '' }))
+            }
+          }
+        });
+      }
+    }
 
     if (assigneeId) {
       await prisma.notification.create({
@@ -149,6 +178,8 @@ async function createTask(req, res) {
       created: created.createdDate.toISOString(),
       start: created.startDate ? created.startDate.toISOString() : '',
       due: created.dueDate.toISOString(),
+      acceptedAt: created.acceptedAt ? created.acceptedAt.toISOString() : '',
+      referenceLinks: created.referenceLinks ? JSON.parse(created.referenceLinks) : [],
       progress: created.progress,
       images: created.attachments.map(att => att.fileUrl),
       comments: []
@@ -162,7 +193,7 @@ async function createTask(req, res) {
 // 3. SECURE: Update task
 async function updateTask(req, res) {
   const { id } = req.params;
-  const { status, progress, title, desc, assigneeId, priority, tag, due } = req.body;
+  const { status, progress, title, desc, assigneeId, priority, tag, due, referenceLinks } = req.body;
 
   try {
     const task = await prisma.task.findUnique({
@@ -205,6 +236,11 @@ async function updateTask(req, res) {
     if (priority !== undefined) data.priority = priority;
     if (tag !== undefined) data.tag = tag;
     if (due !== undefined) data.dueDate = new Date(due);
+    if (referenceLinks !== undefined) {
+      data.referenceLinks = Array.isArray(referenceLinks) && referenceLinks.length
+        ? JSON.stringify(referenceLinks.filter(Boolean))
+        : null;
+    }
 
     if (status === 'inprogress' && !task.startDate) {
       data.startDate = new Date();
@@ -254,6 +290,8 @@ async function updateTask(req, res) {
       created: updated.createdDate.toISOString(),
       start: updated.startDate ? updated.startDate.toISOString() : '',
       due: updated.dueDate.toISOString(),
+      acceptedAt: updated.acceptedAt ? updated.acceptedAt.toISOString() : '',
+      referenceLinks: updated.referenceLinks ? JSON.parse(updated.referenceLinks) : [],
       progress: updated.progress,
       images: updated.attachments.map(att => att.fileUrl),
       comments: updated.comments.map(c => ({
@@ -304,8 +342,18 @@ function uploadAttachment(req, res) {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.json({ fileUrl });
+
+  // multer-storage-cloudinary populates req.file.path with the secure CDN URL.
+  // Local disk storage gives us only a filename; build the static URL ourselves.
+  const isRemote = typeof req.file.path === 'string' && /^https?:\/\//i.test(req.file.path);
+  const fileUrl = isRemote
+    ? req.file.path
+    : `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+  res.json({
+    fileUrl,
+    fileName: req.file.originalname || ''
+  });
 }
 
 // 6. SECURE: Delete task
@@ -390,6 +438,7 @@ async function acceptTask(req, res) {
       start: updated.startDate ? updated.startDate.toISOString() : '',
       due: updated.dueDate.toISOString(),
       acceptedAt: updated.acceptedAt ? updated.acceptedAt.toISOString() : '',
+      referenceLinks: updated.referenceLinks ? JSON.parse(updated.referenceLinks) : [],
       progress: updated.progress,
       images: updated.attachments.map(att => att.fileUrl),
       comments: updated.comments.map(c => ({

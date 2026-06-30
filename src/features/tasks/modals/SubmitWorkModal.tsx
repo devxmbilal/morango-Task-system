@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import type { Milestone, Submission, SubmissionAttachment, WorkspaceSettings } from '../../../types';
+import type { Submission, SubmissionAttachment, WorkspaceSettings } from '../../../types';
 import { api } from '../../../lib/api';
 import { toastError, toastSuccess } from '../../../lib/toast';
 
 interface Props {
-  milestone: Milestone;
-  existing?: Submission | null;     // when set, modal acts in edit-mode
+  milestone: { title: string };          // minimal shape — accepts Milestone or a synthetic object
+  existing?: Submission | null;          // when set, modal acts in edit-mode
   settings: WorkspaceSettings;
   onClose: () => void;
   onSubmit: (data: { description: string; links: string[]; attachments: SubmissionAttachment[] }) => Promise<{ ok: boolean }>;

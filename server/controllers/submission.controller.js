@@ -268,6 +268,84 @@ async function reviewSubmission(req, res) {
   }
 }
 
+// POST /tasks/:id/submit  — direct task-level submission (assignee only, only when task has no sub-tasks)
+// Creates a hidden "Task Delivery" sub-task and a submission on it.
+async function submitTaskDirect(req, res) {
+  const { id } = req.params;
+  const { description, links, attachments } = req.body;
+
+  if (!description || !description.trim()) {
+    return res.status(400).json({ error: 'Description is required' });
+  }
+
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id },
+      include: { milestones: true }
+    });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.assigneeId !== req.user.id) {
+      return res.status(403).json({ error: 'Only the assignee can submit this task' });
+    }
+    if (task.milestones.length > 0) {
+      return res.status(400).json({ error: 'This task has sub-tasks — submit on the relevant sub-task instead.' });
+    }
+
+    const milestone = await prisma.milestone.create({
+      data: {
+        taskId: id,
+        title: 'Task Delivery',
+        description: 'Submitted directly for this task.',
+        order: 0,
+        status: 'submitted'
+      }
+    });
+
+    const submission = await prisma.submission.create({
+      data: {
+        milestoneId: milestone.id,
+        userId: req.user.id,
+        description: description.trim(),
+        links: JSON.stringify(Array.isArray(links) ? links.filter(Boolean) : []),
+        status: 'pending',
+        attachments: {
+          create: (Array.isArray(attachments) ? attachments : [])
+            .filter(a => a && a.fileUrl)
+            .map(a => ({ fileUrl: a.fileUrl, fileName: a.fileName || '', kind: 'submission' }))
+        }
+      },
+      include: { user: true, reviewedBy: true, attachments: true }
+    });
+
+    const admins = await prisma.user.findMany({
+      where: { isActive: true, role: { permAllTasks: true } }
+    });
+    for (const admin of admins) {
+      if (admin.id === req.user.id) continue;
+      await prisma.notification.create({
+        data: {
+          userId: admin.id,
+          title: 'Work Submitted for Review',
+          message: `${req.user.name} submitted work on task ${id}: "${task.title}"`,
+          taskId: id
+        }
+      });
+    }
+    admins.forEach(admin => {
+      if (admin.id === req.user.id || !admin.email) return;
+      sendSubmissionEmail(
+        admin.email, admin.name, req.user.name,
+        id, task.title, 'Task Delivery', description.trim()
+      ).catch(err => console.error('sendSubmissionEmail error:', err));
+    });
+
+    res.json(formatSubmission(submission));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to submit task' });
+  }
+}
+
 // GET /submissions/pending  — admin only, all pending submissions across tasks
 async function listPendingForReview(req, res) {
   try {
@@ -310,6 +388,7 @@ module.exports = {
   updateSubmission,
   reviewSubmission,
   listPendingForReview,
+  submitTaskDirect,
   EDIT_WINDOW_MS,
   canEditSubmission
 };
