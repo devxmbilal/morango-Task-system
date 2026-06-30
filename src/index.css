@@ -6,6 +6,18 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 
 @keyframes tf-overlay { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tf-pop { from { opacity: 0; transform: translateY(12px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes upload-spin { to { transform: rotate(360deg); } }
+
+.upload-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: upload-spin .7s linear infinite;
+  flex: none;
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #d6d6de; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }

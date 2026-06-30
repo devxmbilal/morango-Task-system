@@ -31,10 +31,13 @@ interface CreateTaskViewProps {
   onRemoveImage: (index: number) => void;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
+  uploading?: boolean;
+  uploadingCount?: number;
 }
 
 const CreateTaskView: React.FC<CreateTaskViewProps> = ({
   members, settings, taskForm, onFormChange, onFileUpload, onRemoveImage, onSubmit, onCancel,
+  uploading = false, uploadingCount = 0,
 }) => {
   const [refLinkInput, setRefLinkInput] = useState('');
   const [subtaskModalOpen, setSubtaskModalOpen] = useState(false);
@@ -166,12 +169,19 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({
         {/* Attachments */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e' }}>Attachments</label>
-          <label style={dropZone} className="btn-hover">
+          <label style={{ ...dropZone, opacity: uploading ? 0.7 : 1 }} className="btn-hover">
             <span style={{ fontSize: '20px', color: '#8a8a94' }}>☁</span>
             <span style={{ fontSize: '13px', fontWeight: 700 }}>Click to upload file</span>
             <span style={{ fontSize: '11.5px', color: '#a0a0aa' }}>Images, documents up to 10MB</span>
-            <input type="file" multiple onChange={onFileUpload} style={{ display: 'none' }} />
+            <input type="file" multiple onChange={onFileUpload} disabled={uploading} style={{ display: 'none' }} />
           </label>
+
+          {uploading && (
+            <div style={uploadingChipStyle}>
+              <span className="upload-spinner" />
+              Uploading {uploadingCount} file{uploadingCount === 1 ? '' : 's'}…
+            </div>
+          )}
 
           {taskForm.images.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '12px' }}>
@@ -250,9 +260,9 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({
             style={{ padding: '11px 20px', border: '1px solid #e1e1e8', borderRadius: 10, background: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
             Cancel
           </button>
-          <button type="submit"
-            style={{ padding: '11px 24px', border: 'none', borderRadius: 10, background: settings.accent, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
-            Create ticket
+          <button type="submit" disabled={uploading}
+            style={{ padding: '11px 24px', border: 'none', borderRadius: 10, background: settings.accent, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: uploading ? 'wait' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
+            {uploading ? 'Uploading…' : 'Create ticket'}
           </button>
         </div>
       </form>
@@ -300,6 +310,13 @@ const chipStyle: React.CSSProperties = {
 const removeBtn: React.CSSProperties = {
   border: 'none', background: 'transparent', color: '#dc2626',
   cursor: 'pointer', fontSize: 14, width: 22, height: 22,
+};
+
+const uploadingChipStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  marginTop: 10, padding: '7px 12px',
+  background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe',
+  borderRadius: 8, fontSize: 12.5, fontWeight: 700,
 };
 
 export default CreateTaskView;

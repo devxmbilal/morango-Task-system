@@ -212,6 +212,9 @@ export default function App() {
   // ─── Comment Draft ───
   const [commentDraft, setCommentDraft] = useState<string>('');
 
+  // ─── Create-Task image uploading counter ───
+  const [taskFormUploading, setTaskFormUploading] = useState<number>(0);
+
   // ─── Milestone & Submission Modals ───
   const [milestoneFormOpen, setMilestoneFormOpen] = useState<boolean>(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
@@ -373,12 +376,17 @@ export default function App() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    for (const file of Array.from(e.target.files)) {
+    const files = Array.from(e.target.files);
+    e.target.value = ''; // allow re-selecting same file
+    setTaskFormUploading(c => c + files.length);
+    for (const file of files) {
       try {
         const fileUrl = await uploadFile(file);
         setTaskForm(prev => ({ ...prev, images: [...prev.images, fileUrl] }));
       } catch (err) {
         console.error('File upload failed:', err);
+      } finally {
+        setTaskFormUploading(c => c - 1);
       }
     }
   };
@@ -819,7 +827,7 @@ export default function App() {
                 } />
                 <Route path="/create" element={
                   user.perms?.permCreate ? (
-                    <CreateTaskView members={members} settings={settings} taskForm={taskForm} onFormChange={setTaskForm} onFileUpload={handleFileUpload} onRemoveImage={handleRemoveFormImage} onSubmit={handleCreateTask} onCancel={() => navigate('/board')} />
+                    <CreateTaskView members={members} settings={settings} taskForm={taskForm} onFormChange={setTaskForm} onFileUpload={handleFileUpload} onRemoveImage={handleRemoveFormImage} onSubmit={handleCreateTask} onCancel={() => navigate('/board')} uploading={taskFormUploading > 0} uploadingCount={taskFormUploading} />
                   ) : (
                     <Navigate to="/mytasks" replace />
                   )

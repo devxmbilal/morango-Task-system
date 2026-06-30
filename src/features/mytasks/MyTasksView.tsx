@@ -18,9 +18,65 @@ const MyTasksView: React.FC<MyTasksViewProps> = ({
   onSelectTask,
 }) => {
   const myFiltered = filteredTasks.filter(t => t.assigneeId === user?.id);
+  const awaitingAcceptance = myFiltered.filter(t => !t.acceptedAt);
 
   return (
     <>
+      {/* Awaiting acceptance — new tasks the user hasn't acknowledged yet */}
+      {awaitingAcceptance.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 20, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 15 }}>🔔</span>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#1e40af' }}>
+              New — awaiting your acceptance ({awaitingAcceptance.length})
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {awaitingAcceptance.map(t => {
+              const pri = getPriorityMeta(t.priority);
+              const dl = getDaysLeft(t.due);
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => onSelectTask(t.id)}
+                  className="btn-hover"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '11px 8px', borderRadius: 9, cursor: 'pointer',
+                  }}
+                >
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: 11.5, color: '#9a9aa4', width: 72, flex: 'none',
+                  }}>
+                    {t.id}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {t.title}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#7a7a86', background: '#f1f1f5', padding: '1px 7px', borderRadius: 5 }}>
+                        {t.tag}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: pri.color, background: pri.bg, padding: '1px 7px', borderRadius: 5 }}>
+                        {pri.label}
+                      </span>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: dl < 0 ? '#dc2626' : '#8a8a94', fontWeight: 600, flex: 'none' }}>
+                    {dl < 0 ? `${-dl}d overdue` : dl === 0 ? 'Due today' : `${dl}d left`}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '4px 12px', borderRadius: 20, flex: 'none' }}>
+                    Open to accept →
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stats Row */}
       <div className="mytasks-stats-grid" style={{ display: 'grid', gap: '16px', marginBottom: '20px' }}>
         {myStats.map(st => (

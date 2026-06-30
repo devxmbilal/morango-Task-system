@@ -20,6 +20,7 @@ const SubmitWorkModal: React.FC<Props> = ({ milestone, existing, settings, onClo
     existing?.attachments ? existing.attachments.map(a => ({ ...a })) : []
   );
   const [busy, setBusy] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const addLink = () => {
     const v = linkInput.trim();
@@ -32,7 +33,10 @@ const SubmitWorkModal: React.FC<Props> = ({ milestone, existing, settings, onClo
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    for (const file of Array.from(e.target.files)) {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    setUploadingCount(c => c + files.length);
+    for (const file of files) {
       const formData = new FormData();
       formData.append('file', file);
       try {
@@ -41,9 +45,10 @@ const SubmitWorkModal: React.FC<Props> = ({ milestone, existing, settings, onClo
         toastSuccess(`${file.name} uploaded`);
       } catch (err: any) {
         toastError(err.message || 'Upload failed');
+      } finally {
+        setUploadingCount(c => c - 1);
       }
     }
-    e.target.value = '';
   };
 
   const removeAttachment = (id: number) => setAttachments(prev => prev.filter(a => a.id !== id));
@@ -129,8 +134,15 @@ const SubmitWorkModal: React.FC<Props> = ({ milestone, existing, settings, onClo
           type="file"
           multiple
           onChange={handleFileUpload}
+          disabled={uploadingCount > 0}
           style={{ marginBottom: 8, fontSize: 12.5 }}
         />
+        {uploadingCount > 0 && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 12px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>
+            <span className="upload-spinner" />
+            Uploading {uploadingCount} file{uploadingCount === 1 ? '' : 's'}…
+          </div>
+        )}
         {attachments.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
             {attachments.map(a => (
@@ -145,8 +157,8 @@ const SubmitWorkModal: React.FC<Props> = ({ milestone, existing, settings, onClo
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22, borderTop: '1px solid #f2f2f5', paddingTop: 18 }}>
           <button type="button" onClick={onClose} style={{ padding: '10px 18px', border: '1px solid #e1e1e8', background: '#fff', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#55555e' }}>Cancel</button>
-          <button type="submit" disabled={busy || !description.trim()} style={{ padding: '10px 22px', border: 'none', background: settings.accent || '#4f46e5', color: '#fff', borderRadius: 9, cursor: busy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy || !description.trim() ? 0.6 : 1 }}>
-            {busy ? 'Saving…' : (isEdit ? 'Save Changes' : 'Submit for Review')}
+          <button type="submit" disabled={busy || uploadingCount > 0 || !description.trim()} style={{ padding: '10px 22px', border: 'none', background: settings.accent || '#4f46e5', color: '#fff', borderRadius: 9, cursor: busy || uploadingCount > 0 ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy || uploadingCount > 0 || !description.trim() ? 0.6 : 1 }}>
+            {busy ? 'Saving…' : uploadingCount > 0 ? 'Uploading…' : (isEdit ? 'Save Changes' : 'Submit for Review')}
           </button>
         </div>
       </form>

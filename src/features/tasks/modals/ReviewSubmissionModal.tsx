@@ -19,10 +19,14 @@ const ReviewSubmissionModal: React.FC<Props> = ({ submission, milestoneTitle, on
   const [comment, setComment] = useState('');
   const [reviewAttachments, setReviewAttachments] = useState<SubmissionAttachment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    for (const file of Array.from(e.target.files)) {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    setUploadingCount(c => c + files.length);
+    for (const file of files) {
       const formData = new FormData();
       formData.append('file', file);
       try {
@@ -31,9 +35,10 @@ const ReviewSubmissionModal: React.FC<Props> = ({ submission, milestoneTitle, on
         toastSuccess(`${file.name} uploaded`);
       } catch (err: any) {
         toastError(err.message || 'Upload failed');
+      } finally {
+        setUploadingCount(c => c - 1);
       }
     }
-    e.target.value = '';
   };
 
   const removeReviewAttachment = (id: number) =>
@@ -121,7 +126,13 @@ const ReviewSubmissionModal: React.FC<Props> = ({ submission, milestoneTitle, on
         <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#44444e', marginBottom: 6 }}>
           Attach review files <span style={{ color: '#9a9aa4', fontWeight: 500 }}>(annotated screenshots, references, etc.)</span>
         </label>
-        <input type="file" multiple onChange={handleFileUpload} style={{ marginBottom: 8, fontSize: 12.5 }} />
+        <input type="file" multiple onChange={handleFileUpload} disabled={uploadingCount > 0} style={{ marginBottom: 8, fontSize: 12.5 }} />
+        {uploadingCount > 0 && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 12px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe', borderRadius: 8, fontSize: 12.5, fontWeight: 700 }}>
+            <span className="upload-spinner" />
+            Uploading {uploadingCount} file{uploadingCount === 1 ? '' : 's'}…
+          </div>
+        )}
         {reviewAttachments.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
             {reviewAttachments.map(a => (
@@ -136,11 +147,11 @@ const ReviewSubmissionModal: React.FC<Props> = ({ submission, milestoneTitle, on
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f2f2f5', paddingTop: 18, marginTop: 6 }}>
           <button type="button" onClick={onClose} disabled={busy} style={{ padding: '10px 18px', border: '1px solid #e1e1e8', background: '#fff', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#55555e' }}>Cancel</button>
-          <button type="button" onClick={() => handle('reject')} disabled={busy} style={{ padding: '10px 18px', border: 'none', background: '#ef4444', color: '#fff', borderRadius: 9, cursor: busy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy ? 0.6 : 1 }}>
-            Reject
+          <button type="button" onClick={() => handle('reject')} disabled={busy || uploadingCount > 0} style={{ padding: '10px 18px', border: 'none', background: '#ef4444', color: '#fff', borderRadius: 9, cursor: busy || uploadingCount > 0 ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy || uploadingCount > 0 ? 0.6 : 1 }}>
+            {uploadingCount > 0 ? 'Uploading…' : 'Reject'}
           </button>
-          <button type="button" onClick={() => handle('approve')} disabled={busy} style={{ padding: '10px 22px', border: 'none', background: '#10b981', color: '#fff', borderRadius: 9, cursor: busy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy ? 0.6 : 1 }}>
-            Approve
+          <button type="button" onClick={() => handle('approve')} disabled={busy || uploadingCount > 0} style={{ padding: '10px 22px', border: 'none', background: '#10b981', color: '#fff', borderRadius: 9, cursor: busy || uploadingCount > 0 ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, opacity: busy || uploadingCount > 0 ? 0.6 : 1 }}>
+            {uploadingCount > 0 ? 'Uploading…' : 'Approve'}
           </button>
         </div>
       </div>
