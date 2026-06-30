@@ -19,7 +19,7 @@ function timeAgo(iso: string): string {
 
 const PendingReviewsPanel: React.FC<Props> = ({ pendingReviews, onSelectTask }) => {
   return (
-    <div style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 14, padding: 20, marginTop: 18 }}>
+    <div className="pending-reviews-panel" style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 14, padding: 20, marginTop: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ fontSize: 15 }}>📝</span>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e' }}>
@@ -37,13 +37,13 @@ const PendingReviewsPanel: React.FC<Props> = ({ pendingReviews, onSelectTask }) 
             <div
               key={r.id}
               onClick={() => onSelectTask(r.taskId)}
-              className="btn-hover"
+              className="btn-hover pending-review-row"
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12,
                 padding: '11px 8px', borderRadius: 9, cursor: 'pointer',
               }}
             >
-              <span style={{
+              <span className="pending-review-id" style={{
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 11.5, color: '#9a9aa4', width: 72, flex: 'none', paddingTop: 2,
               }}>
@@ -56,20 +56,20 @@ const PendingReviewsPanel: React.FC<Props> = ({ pendingReviews, onSelectTask }) 
                 }}>
                   {r.milestoneTitle}
                 </div>
-                <div style={{ fontSize: 11.5, color: '#6b6b76', marginTop: 3 }}>
+                <div style={{ fontSize: 11.5, color: '#6b6b76', marginTop: 3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600 }}>{r.userName}</span>
-                  <span style={{ margin: '0 6px', color: '#cccccc' }}>·</span>
+                  <span style={{ color: '#cccccc' }}>·</span>
                   <span style={{
                     overflow: 'hidden', textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 320, verticalAlign: 'bottom',
+                    whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 0',
                   }}>
                     {r.taskTitle}
                   </span>
                 </div>
               </div>
-              <span style={{
+              <span className="pending-review-time" style={{
                 fontSize: 11, fontWeight: 700, color: '#92400e',
-                background: '#fef3c7', padding: '3px 9px', borderRadius: 20, flex: 'none',
+                background: '#fef3c7', padding: '3px 9px', borderRadius: 20, flex: 'none', whiteSpace: 'nowrap',
               }}>
                 {timeAgo(r.createdAt)}
               </span>

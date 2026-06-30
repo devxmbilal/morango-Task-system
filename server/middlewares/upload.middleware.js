@@ -55,12 +55,7 @@ if (useCloudinary) {
   if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
   if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
   if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
-  console.warn(
-    '[upload] Cloudinary NOT configured — falling back to local disk.\n' +
-    '          Missing env vars: ' + missing.join(', ') + '\n' +
-    '          .env loaded from cwd: ' + process.cwd() + '\n' +
-    '          Restart the server after editing .env (nodemon does not auto-reload it).'
-  );
+  
 }
 
 const upload = multer({

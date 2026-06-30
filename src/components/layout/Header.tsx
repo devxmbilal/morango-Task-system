@@ -134,17 +134,20 @@ const Header: React.FC<HeaderProps> = ({
 
           {showNotifications && (
             <div
+              className="notifications-dropdown"
               style={{
                 position: 'absolute',
                 top: '46px',
                 right: 0,
                 width: '320px',
+                maxWidth: 'calc(100vw - 32px)',
                 background: '#fff',
                 border: '1px solid #eaeaef',
                 borderRadius: '14px',
                 boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
                 zIndex: 10,
                 padding: '14px 16px',
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -205,10 +208,10 @@ const Header: React.FC<HeaderProps> = ({
                           cursor: clickable ? 'pointer' : 'default',
                         }}
                       >
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: n.read ? '#16161a' : '#4f46e5' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: n.read ? '#16161a' : '#4f46e5', wordBreak: 'break-word' }}>
                           {n.title}
                         </div>
-                        <div style={{ fontSize: '11.5px', color: '#4b5563', lineHeight: 1.3 }}>{n.message}</div>
+                        <div style={{ fontSize: '11.5px', color: '#4b5563', lineHeight: 1.3, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{n.message}</div>
                         {clickable && (
                           <div style={{ fontSize: '10.5px', color: '#4f46e5', fontWeight: 600, marginTop: 2 }}>
                             Open task →

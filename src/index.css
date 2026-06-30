@@ -83,6 +83,8 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 
 .workspace-content-body {
   padding: 26px 32px;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 /* Screen widths <= 1024px (Tablet layout) */
@@ -293,11 +295,15 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
     display: none !important;
   }
   .recent-ticket-desktop-status,
-  .recent-ticket-desktop-due {
+  .recent-ticket-desktop-due,
+  .recent-ticket-desktop-tag {
     display: none !important;
   }
   .recent-ticket-mobile-meta {
     display: flex !important;
+  }
+  .recent-ticket-item {
+    padding: 10px 6px !important;
   }
 }
 
@@ -311,6 +317,56 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   }
   .overdue-ticket-mobile-meta {
     display: block !important;
+  }
+}
+
+/* Notifications dropdown — mobile (anchor-based positioning overflows
+   when the bell button isn't at the viewport edge, so pin it to the
+   viewport itself with both left and right bounds). */
+@media (max-width: 640px) {
+  .notifications-dropdown {
+    position: fixed !important;
+    top: 60px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+
+/* Pending Reviews Panel — mobile */
+@media (max-width: 640px) {
+  .pending-reviews-panel {
+    padding: 14px !important;
+  }
+  .pending-review-id {
+    display: none !important;
+  }
+  .pending-review-row {
+    gap: 8px !important;
+    padding: 10px 4px !important;
+    flex-wrap: wrap !important;
+  }
+  .pending-review-time {
+    margin-left: auto;
+  }
+}
+
+/* Awaiting Acceptance Panel (MyTasks) — mobile */
+@media (max-width: 640px) {
+  .awaiting-row {
+    gap: 8px !important;
+    padding: 10px 4px !important;
+    flex-wrap: wrap !important;
+  }
+  .awaiting-id,
+  .awaiting-due {
+    display: none !important;
+  }
+  .awaiting-cta {
+    margin-left: auto;
+    font-size: 10px !important;
+    padding: 3px 9px !important;
   }
 }
 

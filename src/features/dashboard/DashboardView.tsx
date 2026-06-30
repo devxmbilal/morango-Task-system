@@ -99,7 +99,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                       >
                         {item.title}
                       </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                      <div
+                        className="recent-ticket-mobile-meta"
+                        style={{ display: 'none', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}
+                      >
                         <span
                           style={{
                             fontSize: '10px',
@@ -108,16 +111,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                             background: '#f1f1f5',
                             padding: '1px 7px',
                             borderRadius: '5px',
-                            display: 'inline-block',
                           }}
                         >
                           {item.tag}
                         </span>
-                      </div>
-                      <div
-                        className="recent-ticket-mobile-meta"
-                        style={{ display: 'none', gap: '8px', alignItems: 'center', marginTop: '4px' }}
-                      >
                         <span
                           style={{
                             fontSize: '10px',
@@ -130,21 +127,37 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {sm.label}
                         </span>
+                        {item.status !== 'done' && (
+                          <span
+                            style={{
+                              fontSize: '10.5px',
+                              color: dl < 0 ? '#dc2626' : '#8a8a94',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {dl < 0
+                              ? `${-dl}d overdue`
+                              : dl === 0
+                              ? 'Today'
+                              : `${dl}d left`}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="recent-ticket-desktop-tag"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}
+                      >
                         <span
                           style={{
-                            fontSize: '10.5px',
-                            color:
-                              item.status === 'done' ? '#059669' : dl < 0 ? '#dc2626' : '#8a8a94',
+                            fontSize: '10px',
                             fontWeight: 600,
+                            color: '#7a7a86',
+                            background: '#f1f1f5',
+                            padding: '1px 7px',
+                            borderRadius: '5px',
                           }}
                         >
-                          {item.status === 'done'
-                            ? 'Done'
-                            : dl < 0
-                            ? `${-dl}d overdue`
-                            : dl === 0
-                            ? 'Today'
-                            : `${dl}d left`}
+                          {item.tag}
                         </span>
                       </div>
                     </div>
@@ -233,6 +246,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                       className="btn-hover recent-ticket-item"
                     >
                       <span
+                        className="overdue-ticket-id"
                         style={{
                           fontFamily: "'IBM Plex Mono', monospace",
                           fontSize: '11.5px',
@@ -291,6 +305,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                         {getInitials(assignee?.name || '?')}
                       </div>
                       <span
+                        className="overdue-ticket-desktop-due"
                         style={{
                           fontSize: '11.5px',
                           fontWeight: 700,
@@ -314,42 +329,56 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         <div style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
           <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px' }}>Team workload</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {members.map(m => (
-              <div key={m.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '6px' }}>
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '7px',
-                      background: m.color,
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '10px',
-                    }}
-                  >
-                    {m.initials}
+            {members.map(m => {
+              const active = m.active ?? 0;
+              const total = m.total ?? 0;
+              const hasWork = total > 0;
+              const widthPct = hasWork ? Math.round((active / total) * 100) : 0;
+              return (
+                <div key={m.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '6px' }}>
+                    <div
+                      style={{
+                        width: '26px', height: '26px', borderRadius: 7,
+                        background: m.color, color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: 10, flex: 'none',
+                      }}
+                    >
+                      {m.initials}
+                    </div>
+                    <span style={{
+                      fontSize: 12.5, fontWeight: 600, flex: 1, minWidth: 0,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {m.name}
+                    </span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: active > 0 ? settings.accent : '#8a8a94',
+                      background: active > 0
+                        ? `color-mix(in srgb, ${settings.accent} 12%, #fff)`
+                        : '#f1f1f5',
+                      padding: '3px 9px', borderRadius: 12,
+                      flex: 'none', whiteSpace: 'nowrap',
+                    }}>
+                      {active}/{total} active
+                    </span>
                   </div>
-                  <span style={{ fontSize: '12.5px', fontWeight: 600, flex: 1 }}>{m.name}</span>
-                  <span style={{ fontSize: '11.5px', color: '#9a9aa4', fontWeight: 600 }}>
-                    {m.active} active
-                  </span>
+                  <div style={{ height: 5, background: '#eef0f3', borderRadius: 4, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${widthPct}%`,
+                        background: settings.accent,
+                        borderRadius: 4,
+                        transition: 'width .25s ease',
+                      }}
+                    />
+                  </div>
                 </div>
-                <div style={{ height: '7px', background: '#eef0f3', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.min(100, m.active * 34)}%`,
-                      background: settings.accent,
-                      borderRadius: '6px',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

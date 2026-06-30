@@ -39,13 +39,13 @@ const MyTasksView: React.FC<MyTasksViewProps> = ({
                 <div
                   key={t.id}
                   onClick={() => onSelectTask(t.id)}
-                  className="btn-hover"
+                  className="btn-hover awaiting-row"
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '11px 8px', borderRadius: 9, cursor: 'pointer',
                   }}
                 >
-                  <span style={{
+                  <span className="awaiting-id" style={{
                     fontFamily: "'IBM Plex Mono', monospace",
                     fontSize: 11.5, color: '#9a9aa4', width: 72, flex: 'none',
                   }}>
@@ -55,7 +55,7 @@ const MyTasksView: React.FC<MyTasksViewProps> = ({
                     <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {t.title}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 10, fontWeight: 600, color: '#7a7a86', background: '#f1f1f5', padding: '1px 7px', borderRadius: 5 }}>
                         {t.tag}
                       </span>
@@ -64,11 +64,11 @@ const MyTasksView: React.FC<MyTasksViewProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span style={{ fontSize: 11, color: dl < 0 ? '#dc2626' : '#8a8a94', fontWeight: 600, flex: 'none' }}>
+                  <span className="awaiting-due" style={{ fontSize: 11, color: dl < 0 ? '#dc2626' : '#8a8a94', fontWeight: 600, flex: 'none' }}>
                     {dl < 0 ? `${-dl}d overdue` : dl === 0 ? 'Due today' : `${dl}d left`}
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '4px 12px', borderRadius: 20, flex: 'none' }}>
-                    Open to accept →
+                  <span className="awaiting-cta" style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '4px 12px', borderRadius: 20, flex: 'none', whiteSpace: 'nowrap' }}>
+                    Open →
                   </span>
                 </div>
               );
