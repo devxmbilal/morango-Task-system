@@ -25,9 +25,22 @@ export function useNotifications() {
     }
   };
 
+  const markOneRead = async (id: number) => {
+    // Optimistic local update so the UI updates instantly
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    try {
+      await api.put(`/notifications/${id}/read`);
+      return { ok: true };
+    } catch (e: any) {
+      console.error('Error marking notification as read:', e);
+      return { ok: false };
+    }
+  };
+
   return {
     notifications,
     fetchNotifications,
     markNotificationsRead,
+    markOneRead,
   };
 }

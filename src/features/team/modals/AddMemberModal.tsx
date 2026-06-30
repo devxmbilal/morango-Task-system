@@ -26,7 +26,6 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
 }) => {
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -41,7 +40,6 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
     >
       <form
         onSubmit={onSubmit}
-        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '460px',

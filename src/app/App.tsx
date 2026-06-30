@@ -6,6 +6,8 @@ import type {
   Permission,
   Task,
   WorkspaceSettings,
+  Milestone,
+  Submission,
 } from '../types';
 
 // Lib
@@ -34,6 +36,9 @@ import EditTaskModal from '../features/tasks/modals/EditTaskModal';
 import AddMemberModal from '../features/team/modals/AddMemberModal';
 import EditMemberModal from '../features/team/modals/EditMemberModal';
 import AddRoleModal from '../features/roles/modals/AddRoleModal';
+import MilestoneFormModal from '../features/tasks/modals/MilestoneFormModal';
+import SubmitWorkModal from '../features/tasks/modals/SubmitWorkModal';
+import ReviewSubmissionModal from '../features/tasks/modals/ReviewSubmissionModal';
 
 // Hooks
 import { useAuth } from '../hooks/useAuth';
@@ -42,6 +47,7 @@ import { useMembers } from '../hooks/useMembers';
 import { useRoles } from '../hooks/useRoles';
 import { useSettings } from '../hooks/useSettings';
 import { useNotifications } from '../hooks/useNotifications';
+import { useMilestones } from '../hooks/useMilestones';
 
 // Toast type
 interface Toast { id: number; message: string; type: 'success' | 'error'; }
@@ -73,6 +79,7 @@ export default function App() {
     deleteTask,
     updateTask,
     postComment,
+    acceptTask,
   } = useTasks();
 
   const {
@@ -95,7 +102,22 @@ export default function App() {
     notifications,
     fetchNotifications,
     markNotificationsRead,
+    markOneRead,
   } = useNotifications();
+
+  const {
+    milestones,
+    setMilestones,
+    fetchMilestones,
+    createMilestone,
+    updateMilestone,
+    deleteMilestone,
+    submitWork,
+    editSubmission,
+    reviewSubmission,
+    pendingReviews,
+    fetchPendingReviews,
+  } = useMilestones();
 
   // ─── Toast State ───
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -180,6 +202,12 @@ export default function App() {
   // ─── Comment Draft ───
   const [commentDraft, setCommentDraft] = useState<string>('');
 
+  // ─── Milestone & Submission Modals ───
+  const [milestoneFormOpen, setMilestoneFormOpen] = useState<boolean>(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [submitWorkFor, setSubmitWorkFor] = useState<{ milestone: Milestone; submission: Submission | null } | null>(null);
+  const [reviewingSubmission, setReviewingSubmission] = useState<{ submission: Submission; milestone: Milestone } | null>(null);
+
   // ─── Refs ───
   const userLoadedRef = useRef<boolean>(false);
 
@@ -228,6 +256,14 @@ export default function App() {
     const interval = setInterval(fetchNotifications, 10000);
     return () => clearInterval(interval);
   }, [token, fetchNotifications]);
+
+  // Periodic pending-reviews fetch (admin only — server returns 403 for non-admins which we ignore)
+  useEffect(() => {
+    if (!token || !user?.perms?.permAllTasks) return;
+    fetchPendingReviews();
+    const interval = setInterval(fetchPendingReviews, 15000);
+    return () => clearInterval(interval);
+  }, [token, user, fetchPendingReviews]);
 
   // Data preloading & initial view routing on login/refresh
   useEffect(() => {
@@ -278,6 +314,12 @@ export default function App() {
     }
   }, [token]);
 
+  // Fetch milestones when a task is selected
+  useEffect(() => {
+    if (selectedId) fetchMilestones(selectedId);
+    else setMilestones([]);
+  }, [selectedId, fetchMilestones, setMilestones]);
+
   // ─── Operations ───
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -292,12 +334,26 @@ export default function App() {
     await markNotificationsRead();
   };
 
+  const handleNotificationClick = (n: typeof notifications[number]) => {
+    if (n.taskId) {
+      setSearchQuery('');
+      setSelectedId(n.taskId);
+      setShowNotifications(false);
+    }
+    if (!n.read) markOneRead(n.id);
+  };
+
   const handleMoveTask = async (taskId: string, status: string) => {
     await moveTask(taskId, status);
   };
 
   const handleSetProgress = async (taskId: string, progress: number) => {
     await setProgress(taskId, progress);
+  };
+
+  const handleAcceptTask = async (taskId: string) => {
+    const res = await acceptTask(taskId);
+    if (res.ok) fetchNotifications();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -441,6 +497,72 @@ export default function App() {
 
   const handleSaveSettings = async (newSettings: WorkspaceSettings) => {
     await saveSettings(newSettings);
+  };
+
+  // ─── Milestone Handlers ───
+  const handleOpenAddMilestone = () => {
+    setEditingMilestone(null);
+    setMilestoneFormOpen(true);
+  };
+
+  const handleOpenEditMilestone = (m: Milestone) => {
+    setEditingMilestone(m);
+    setMilestoneFormOpen(true);
+  };
+
+  const handleSaveMilestone = async (form: { title: string; description: string; dueDate?: string }) => {
+    if (!selectedId) return { ok: false };
+    if (editingMilestone) {
+      const res = await updateMilestone(editingMilestone.id, form);
+      if (res.ok) fetchMilestones(selectedId);
+      return res;
+    } else {
+      const res = await createMilestone(selectedId, form);
+      if (res.ok) {
+        fetchMilestones(selectedId);
+        fetchTasks();
+      }
+      return res;
+    }
+  };
+
+  const handleDeleteMilestone = async (m: Milestone) => {
+    if (!window.confirm(`Delete milestone "${m.title}"? All its submissions will be removed.`)) return;
+    const res = await deleteMilestone(m.id);
+    if (res.ok && selectedId) {
+      fetchMilestones(selectedId);
+      fetchTasks();
+    }
+  };
+
+  const handleOpenSubmitWork = (m: Milestone) =>
+    setSubmitWorkFor({ milestone: m, submission: null });
+
+  const handleOpenEditSubmission = (s: Submission, m: Milestone) =>
+    setSubmitWorkFor({ milestone: m, submission: s });
+
+  const handleSubmitWork = async (data: { description: string; links: string[]; attachments: any[] }) => {
+    if (!submitWorkFor) return { ok: false };
+    const res = submitWorkFor.submission
+      ? await editSubmission(submitWorkFor.submission.id, data)
+      : await submitWork(submitWorkFor.milestone.id, data);
+    if (res.ok && selectedId) fetchMilestones(selectedId);
+    return res;
+  };
+
+  const handleOpenReview = (s: Submission, m: Milestone) =>
+    setReviewingSubmission({ submission: s, milestone: m });
+
+  const handleReviewSubmission = async (action: 'approve' | 'reject', comment: string, reviewAttachments: any[]) => {
+    if (!reviewingSubmission) return { ok: false };
+    const res = await reviewSubmission(reviewingSubmission.submission.id, action, comment, reviewAttachments);
+    if (res.ok) {
+      if (selectedId) fetchMilestones(selectedId);
+      fetchTasks();           // task.progress / status may have auto-updated
+      fetchNotifications();
+      fetchPendingReviews();  // remove from pending list
+    }
+    return res;
   };
 
   // ─── Derived Data ───
@@ -617,6 +739,7 @@ export default function App() {
               onToggleNotifications={() => { setShowNotifications(p => !p); setShowProfileMenu(false); }}
               onToggleProfileMenu={() => { setShowProfileMenu(p => !p); setShowNotifications(false); }}
               onMarkAllRead={handleMarkNotificationsRead}
+              onNotificationClick={handleNotificationClick}
               onNavigate={v => { setSearchQuery(''); navigate(`/${v}`); setShowProfileMenu(false); }}
               onCreateTask={() => navigate('/create')}
               onLogout={() => { handleLogout(); setShowProfileMenu(false); }}
@@ -628,7 +751,7 @@ export default function App() {
                 <Route path="/" element={<Navigate to={user.perms?.permAllTasks ? "/dashboard" : "/mytasks"} replace />} />
                 <Route path="/dashboard" element={
                   user.perms?.permAllTasks ? (
-                    <DashboardView tasks={tasks} filteredTasks={filteredTasks} members={teamMembers} settings={settings} stats={stats} onSelectTask={setSelectedId} />
+                    <DashboardView tasks={tasks} filteredTasks={filteredTasks} members={teamMembers} settings={settings} stats={stats} pendingReviews={pendingReviews} onSelectTask={setSelectedId} />
                   ) : (
                     <Navigate to="/mytasks" replace />
                   )
@@ -686,7 +809,54 @@ export default function App() {
       )}
 
       {/* ── MODALS ── */}
-      {selectedTask && <TaskDetailModal task={selectedTask} members={members} settings={settings} commentDraft={commentDraft} onClose={() => setSelectedId(null)} onMoveTask={handleMoveTask} onSetProgress={handleSetProgress} onCommentChange={setCommentDraft} onPostComment={handlePostComment} />}
+      {selectedTask && user && (
+        <TaskDetailModal
+          task={selectedTask}
+          members={members}
+          user={user}
+          settings={settings}
+          commentDraft={commentDraft}
+          milestones={milestones}
+          onClose={() => setSelectedId(null)}
+          onMoveTask={handleMoveTask}
+          onSetProgress={handleSetProgress}
+          onCommentChange={setCommentDraft}
+          onPostComment={handlePostComment}
+          onAddMilestone={handleOpenAddMilestone}
+          onEditMilestone={handleOpenEditMilestone}
+          onDeleteMilestone={handleDeleteMilestone}
+          onSubmitWork={handleOpenSubmitWork}
+          onEditSubmission={handleOpenEditSubmission}
+          onReviewSubmission={handleOpenReview}
+          onAcceptTask={handleAcceptTask}
+        />
+      )}
+      {milestoneFormOpen && (
+        <MilestoneFormModal
+          existing={editingMilestone}
+          settings={settings}
+          onClose={() => { setMilestoneFormOpen(false); setEditingMilestone(null); }}
+          onSubmit={handleSaveMilestone}
+        />
+      )}
+      {submitWorkFor && (
+        <SubmitWorkModal
+          milestone={submitWorkFor.milestone}
+          existing={submitWorkFor.submission}
+          settings={settings}
+          onClose={() => setSubmitWorkFor(null)}
+          onSubmit={handleSubmitWork}
+        />
+      )}
+      {reviewingSubmission && (
+        <ReviewSubmissionModal
+          submission={reviewingSubmission.submission}
+          milestoneTitle={reviewingSubmission.milestone.title}
+          settings={settings}
+          onClose={() => setReviewingSubmission(null)}
+          onReview={handleReviewSubmission}
+        />
+      )}
       {addingMember && <AddMemberModal roles={roles} settings={settings} memberForm={memberForm} onFormChange={setMemberForm} onSubmit={handleCreateMember} onClose={() => setAddingMember(false)} />}
       {addingRole && <AddRoleModal settings={settings} roleForm={roleForm} onFormChange={setRoleForm} onTogglePerm={handleToggleRolePerm} onSubmit={handleCreateRole} onClose={() => setAddingRole(false)} />}
       {editingTask && <EditTaskModal task={editingTask} members={members} settings={settings} editTaskForm={editTaskForm} onFormChange={setEditTaskForm} onSubmit={handleUpdateTask} onClose={() => setEditingTask(null)} />}

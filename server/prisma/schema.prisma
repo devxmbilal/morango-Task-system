@@ -35,6 +35,8 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   tasks        Task[]
   notifications Notification[]
+  submissions          Submission[]
+  reviewedSubmissions  Submission[] @relation("ReviewedSubmissions")
 
   @@map("users")
 }
@@ -51,11 +53,58 @@ model Task {
   createdDate DateTime     @default(now()) @map("created_date") @db.Date
   startDate   DateTime?    @map("start_date")
   dueDate     DateTime     @map("due_date")
+  acceptedAt  DateTime?    @map("accepted_at")
   progress    Int          @default(0)
   comments    Comment[]
   attachments Attachment[]
+  milestones  Milestone[]
 
   @@map("tasks")
+}
+
+model Milestone {
+  id          Int          @id @default(autoincrement())
+  taskId      String       @map("task_id")
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?    @map("due_date")
+  order       Int          @default(0)
+  status      String       @default("pending") // "pending", "submitted", "approved", "rejected"
+  createdAt   DateTime     @default(now()) @map("created_at")
+  submissions Submission[]
+
+  @@map("milestones")
+}
+
+model Submission {
+  id              Int                      @id @default(autoincrement())
+  milestoneId     Int                      @map("milestone_id")
+  milestone       Milestone                @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  userId          String                   @map("user_id")
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description     String
+  links           String?                  // JSON-encoded array of URLs
+  status          String                   @default("pending") // "pending", "approved", "rejected"
+  reviewComment   String?                  @map("review_comment")
+  reviewedById    String?                  @map("reviewed_by_id")
+  reviewedBy      User?                    @relation("ReviewedSubmissions", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?                @map("reviewed_at")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  attachments     SubmissionAttachment[]
+
+  @@map("submissions")
+}
+
+model SubmissionAttachment {
+  id           Int        @id @default(autoincrement())
+  submissionId Int        @map("submission_id")
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fileUrl      String     @map("file_url")
+  fileName     String?    @map("file_name")
+  kind         String     @default("submission") // "submission" | "review"
+
+  @@map("submission_attachments")
 }
 
 model Comment {
@@ -100,6 +149,7 @@ model Notification {
   title     String
   message   String
   read      Boolean  @default(false)
+  taskId    String?  @map("task_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")

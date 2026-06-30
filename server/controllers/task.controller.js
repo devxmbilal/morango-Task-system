@@ -45,6 +45,7 @@ async function getTasks(req, res) {
       created: t.createdDate.toISOString(),
       start: t.startDate ? t.startDate.toISOString() : '',
       due: t.dueDate.toISOString(),
+      acceptedAt: t.acceptedAt ? t.acceptedAt.toISOString() : '',
       progress: t.progress,
       images: t.attachments.map(att => att.fileUrl),
       comments: t.comments.map(c => ({
@@ -102,7 +103,8 @@ async function createTask(req, res) {
         data: {
           userId: assigneeId,
           title: 'New Task Assigned',
-          message: `You have been assigned task ${nextId}: "${title}"`
+          message: `You have been assigned task ${nextId}: "${title}"`,
+          taskId: nextId
         }
       });
 
@@ -174,6 +176,14 @@ async function updateTask(req, res) {
     const data = {};
     if (status !== undefined) data.status = status;
     if (progress !== undefined) {
+      // If task has milestones, progress is owned by the milestone-approval flow.
+      // Reject manual progress edits so the bar stays in sync with approvals.
+      const msCount = await prisma.milestone.count({ where: { taskId: id } });
+      if (msCount > 0) {
+        return res.status(400).json({
+          error: 'This task has milestones — progress updates automatically as milestones are approved. Manual progress edit is disabled.'
+        });
+      }
       data.progress = parseInt(progress, 10);
       if (data.progress >= 100) {
         data.status = 'done';
@@ -189,6 +199,7 @@ async function updateTask(req, res) {
       data.assigneeId = assigneeId || null;
       if ((assigneeId || null) !== task.assigneeId) {
         data.startDate = assigneeId ? new Date() : null;
+        data.acceptedAt = null; // new assignee needs to accept again
       }
     }
     if (priority !== undefined) data.priority = priority;
@@ -207,7 +218,8 @@ async function updateTask(req, res) {
         data: {
           userId: newAssigneeId,
           title: 'Task Assigned',
-          message: `Task ${id} has been assigned to you: "${title || task.title}"`
+          message: `Task ${id} has been assigned to you: "${title || task.title}"`,
+          taskId: id
         }
       });
 
@@ -320,11 +332,83 @@ async function deleteTask(req, res) {
   }
 }
 
+// 7. SECURE: Assignee accepts the task
+async function acceptTask(req, res) {
+  const { id } = req.params;
+  try {
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    if (task.assigneeId !== req.user.id) {
+      return res.status(403).json({ error: 'Only the assignee can accept this task' });
+    }
+    if (task.acceptedAt) {
+      return res.status(400).json({ error: 'Task already accepted' });
+    }
+
+    const data = {
+      acceptedAt: new Date(),
+      startDate: task.startDate || new Date()
+    };
+    if (task.status === 'todo') data.status = 'inprogress';
+
+    const updated = await prisma.task.update({
+      where: { id },
+      data,
+      include: {
+        assignee: true,
+        comments: { orderBy: { createdAt: 'desc' } },
+        attachments: true
+      }
+    });
+
+    // Notify all admins that user has accepted the task
+    const admins = await prisma.user.findMany({
+      where: { isActive: true, role: { permAllTasks: true } }
+    });
+    for (const admin of admins) {
+      if (admin.id === req.user.id) continue;
+      await prisma.notification.create({
+        data: {
+          userId: admin.id,
+          title: 'Task Accepted',
+          message: `${req.user.name} has accepted task ${id}: "${task.title}" and started working on it.`,
+          taskId: id
+        }
+      });
+    }
+
+    res.json({
+      id: updated.id,
+      title: updated.title,
+      desc: updated.description,
+      assigneeId: updated.assigneeId || '',
+      status: updated.status,
+      priority: updated.priority,
+      tag: updated.tag,
+      created: updated.createdDate.toISOString(),
+      start: updated.startDate ? updated.startDate.toISOString() : '',
+      due: updated.dueDate.toISOString(),
+      acceptedAt: updated.acceptedAt ? updated.acceptedAt.toISOString() : '',
+      progress: updated.progress,
+      images: updated.attachments.map(att => att.fileUrl),
+      comments: updated.comments.map(c => ({
+        id: c.id, author: c.authorName, text: c.text,
+        time: require('../utils/time').formatRelativeTime(c.createdAt)
+      }))
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to accept task' });
+  }
+}
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   addComment,
   uploadAttachment,
-  deleteTask
+  deleteTask,
+  acceptTask
 };

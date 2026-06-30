@@ -1,6 +1,7 @@
 import React from 'react';
-import type { Task, WorkspaceSettings } from '../../types';
+import type { PendingReview, Task, WorkspaceSettings } from '../../types';
 import { getInitials, getStatusMeta, getDaysLeft } from '../../lib/utils';
+import PendingReviewsPanel from './PendingReviewsPanel';
 
 interface DashboardViewProps {
   tasks: Task[];
@@ -8,17 +9,21 @@ interface DashboardViewProps {
   members: any[];
   settings: WorkspaceSettings;
   stats: Array<{ label: string; value: number; color: string; sub: string; subColor: string }>;
+  pendingReviews: PendingReview[];
   onSelectTask: (id: string) => void;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
+  tasks,
   filteredTasks,
   members,
   settings,
   stats,
+  pendingReviews,
   onSelectTask,
 }) => {
   const getUserById = (id: string) => members.find(m => m.id === id);
+  const overdueList = tasks.filter(t => getDaysLeft(t.due) < 0 && t.status !== 'done');
 
   return (
     <>
@@ -41,146 +46,268 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         ))}
       </div>
 
+      <PendingReviewsPanel pendingReviews={pendingReviews} onSelectTask={onSelectTask} />
+
       {/* Charts Grid */}
       <div className="dashboard-charts-grid" style={{ display: 'grid', gap: '18px', marginTop: '18px' }}>
-        {/* Recent Tickets */}
-        <div style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Recent tickets</div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {filteredTasks.slice(0, 6).map(item => {
-              const assignee = getUserById(item.assigneeId);
-              const sm = getStatusMeta(item.status);
-              const dl = getDaysLeft(item.due);
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => onSelectTask(item.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '11px 8px',
-                    borderRadius: '9px',
-                    cursor: 'pointer',
-                  }}
-                  className="btn-hover recent-ticket-item"
-                >
-                  <span
-                    className="recent-ticket-id"
+        {/* Left Column Stack */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Recent Tickets */}
+          <div style={{ background: '#fff', border: '1px solid #ececf1', borderRadius: '14px', padding: '20px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Recent tickets</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredTasks.slice(0, 6).map(item => {
+                const assignee = getUserById(item.assigneeId);
+                const sm = getStatusMeta(item.status);
+                const dl = getDaysLeft(item.due);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => onSelectTask(item.id)}
                     style={{
-                      fontFamily: "'IBM Plex Mono', monospace",
-                      fontSize: '11.5px',
-                      color: '#9a9aa4',
-                      width: '72px',
-                      flex: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '11px 8px',
+                      borderRadius: '9px',
+                      cursor: 'pointer',
                     }}
+                    className="btn-hover recent-ticket-item"
                   >
-                    {item.id}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }} className="recent-ticket-title-container">
                     <span
+                      className="recent-ticket-id"
                       style={{
-                        fontSize: '13.5px',
-                        fontWeight: 600,
-                        display: 'block',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: '11.5px',
+                        color: '#9a9aa4',
+                        width: '72px',
+                        flex: 'none',
                       }}
                     >
-                      {item.title}
+                      {item.id}
                     </span>
+                    <div style={{ flex: 1, minWidth: 0 }} className="recent-ticket-title-container">
+                      <span
+                        style={{
+                          fontSize: '13.5px',
+                          fontWeight: 600,
+                          display: 'block',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.title}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: '#7a7a86',
+                            background: '#f1f1f5',
+                            padding: '1px 7px',
+                            borderRadius: '5px',
+                            display: 'inline-block',
+                          }}
+                        >
+                          {item.tag}
+                        </span>
+                      </div>
+                      <div
+                        className="recent-ticket-mobile-meta"
+                        style={{ display: 'none', gap: '8px', alignItems: 'center', marginTop: '4px' }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: sm.color,
+                            background: `color-mix(in srgb, ${sm.color} 12%, #fff)`,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {sm.label}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '10.5px',
+                            color:
+                              item.status === 'done' ? '#059669' : dl < 0 ? '#dc2626' : '#8a8a94',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.status === 'done'
+                            ? 'Done'
+                            : dl < 0
+                            ? `${-dl}d overdue`
+                            : dl === 0
+                            ? 'Today'
+                            : `${dl}d left`}
+                        </span>
+                      </div>
+                    </div>
                     <div
-                      className="recent-ticket-mobile-meta"
-                      style={{ display: 'none', gap: '8px', alignItems: 'center', marginTop: '4px' }}
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '8px',
+                        background: assignee?.color || '#94a3b8',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: '10.5px',
+                        flex: 'none',
+                      }}
+                    >
+                      {getInitials(assignee?.name || '?')}
+                    </div>
+                    <span
+                      className="recent-ticket-desktop-status"
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: sm.color,
+                        background: `color-mix(in srgb, ${sm.color} 12%, #fff)`,
+                        padding: '3px 9px',
+                        borderRadius: '20px',
+                        flex: 'none',
+                        width: '90px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {sm.label}
+                    </span>
+                    <span
+                      className="recent-ticket-desktop-due"
+                      style={{
+                        fontSize: '12px',
+                        color:
+                          item.status === 'done' ? '#059669' : dl < 0 ? '#dc2626' : '#8a8a94',
+                        width: '74px',
+                        textAlign: 'right',
+                        flex: 'none',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {item.status === 'done'
+                        ? 'Done'
+                        : dl < 0
+                        ? `${-dl}d overdue`
+                        : dl === 0
+                        ? 'Due today'
+                        : `${dl}d left`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Overdue Tickets (Shown only if there are any) */}
+          {overdueList.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #fee2e2', borderRadius: '14px', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <span style={{ fontSize: '15px' }}>⚠️</span>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#991b1b' }}>Overdue tickets ({overdueList.length})</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {overdueList.map(item => {
+                  const assignee = getUserById(item.assigneeId);
+                  const dl = getDaysLeft(item.due);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => onSelectTask(item.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '11px 8px',
+                        borderRadius: '9px',
+                        cursor: 'pointer',
+                      }}
+                      className="btn-hover recent-ticket-item"
                     >
                       <span
                         style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          color: sm.color,
-                          background: `color-mix(in srgb, ${sm.color} 12%, #fff)`,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        {sm.label}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '10.5px',
-                          color:
-                            item.status === 'done' ? '#059669' : dl < 0 ? '#dc2626' : '#8a8a94',
+                          fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: '11.5px',
+                          color: '#ef4444',
+                          width: '72px',
+                          flex: 'none',
                           fontWeight: 600,
                         }}
                       >
-                        {item.status === 'done'
-                          ? 'Done'
-                          : dl < 0
-                          ? `${-dl}d overdue`
-                          : dl === 0
-                          ? 'Today'
-                          : `${dl}d left`}
+                        {item.id}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span
+                          style={{
+                            fontSize: '13.5px',
+                            fontWeight: 600,
+                            display: 'block',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {item.title}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              color: '#7a7a86',
+                              background: '#f1f1f5',
+                              padding: '1px 7px',
+                              borderRadius: '5px',
+                              display: 'inline-block',
+                            }}
+                          >
+                            {item.tag}
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '8px',
+                          background: assignee?.color || '#94a3b8',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '10.5px',
+                          flex: 'none',
+                        }}
+                      >
+                        {getInitials(assignee?.name || '?')}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: '#ef4444',
+                          width: '90px',
+                          textAlign: 'right',
+                          flex: 'none',
+                        }}
+                      >
+                        {-dl}d overdue
                       </span>
                     </div>
-                  </div>
-                  <div
-                    style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '8px',
-                      background: assignee?.color || '#94a3b8',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '10.5px',
-                      flex: 'none',
-                    }}
-                  >
-                    {getInitials(assignee?.name || '?')}
-                  </div>
-                  <span
-                    className="recent-ticket-desktop-status"
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: sm.color,
-                      background: `color-mix(in srgb, ${sm.color} 12%, #fff)`,
-                      padding: '3px 9px',
-                      borderRadius: '20px',
-                      flex: 'none',
-                      width: '90px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {sm.label}
-                  </span>
-                  <span
-                    className="recent-ticket-desktop-due"
-                    style={{
-                      fontSize: '12px',
-                      color:
-                        item.status === 'done' ? '#059669' : dl < 0 ? '#dc2626' : '#8a8a94',
-                      width: '74px',
-                      textAlign: 'right',
-                      flex: 'none',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {item.status === 'done'
-                      ? 'Done'
-                      : dl < 0
-                      ? `${-dl}d overdue`
-                      : dl === 0
-                      ? 'Due today'
-                      : `${dl}d left`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Team Workload */}

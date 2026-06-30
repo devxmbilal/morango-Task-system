@@ -153,6 +153,11 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({
               <option value="Backend API">Backend API</option>
               <option value="DevOps">DevOps</option>
               <option value="QA">QA</option>
+              <option value="AI Creative">AI Creative</option>
+              <option value="AI Automation">AI Automation</option>
+              <option value="Digital Strategy">Digital Strategy</option>
+              <option value="AI Labs">AI Labs</option>
+              <option value="Events & Experiences">Events & Experiences</option>
             </select>
           </div>
           <div>

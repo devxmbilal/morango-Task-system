@@ -12,6 +12,7 @@ interface HeaderProps {
   onToggleNotifications: () => void;
   onToggleProfileMenu: () => void;
   onMarkAllRead: () => void;
+  onNotificationClick: (n: AppNotification) => void;
   onNavigate: (v: string) => void;
   onCreateTask: () => void;
   onLogout: () => void;
@@ -28,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   onToggleNotifications,
   onToggleProfileMenu,
   onMarkAllRead,
+  onNotificationClick,
   onNavigate,
   onCreateTask,
   onLogout,
@@ -186,25 +188,35 @@ const Header: React.FC<HeaderProps> = ({
                     No notifications yet
                   </div>
                 ) : (
-                  notifications.map(n => (
-                    <div
-                      key={n.id}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        background: n.read ? '#fff' : 'rgba(79, 70, 229, 0.05)',
-                        border: '1px solid #f1f1f5',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px',
-                      }}
-                    >
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: n.read ? '#16161a' : '#4f46e5' }}>
-                        {n.title}
+                  notifications.map(n => {
+                    const clickable = !!n.taskId;
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={clickable ? () => onNotificationClick(n) : undefined}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          background: n.read ? '#fff' : 'rgba(79, 70, 229, 0.05)',
+                          border: '1px solid #f1f1f5',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          cursor: clickable ? 'pointer' : 'default',
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: n.read ? '#16161a' : '#4f46e5' }}>
+                          {n.title}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: '#4b5563', lineHeight: 1.3 }}>{n.message}</div>
+                        {clickable && (
+                          <div style={{ fontSize: '10.5px', color: '#4f46e5', fontWeight: 600, marginTop: 2 }}>
+                            Open task →
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: '11.5px', color: '#4b5563', lineHeight: 1.3 }}>{n.message}</div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

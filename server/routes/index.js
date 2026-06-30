@@ -7,6 +7,7 @@ const memberRoutes = require('./member.routes');
 const roleRoutes = require('./role.routes');
 const settingRoutes = require('./setting.routes');
 const notificationRoutes = require('./notification.routes');
+const milestoneRoutes = require('./milestone.routes');
 
 // Mount routes
 router.use(authRoutes);
@@ -15,5 +16,6 @@ router.use(memberRoutes);
 router.use(roleRoutes);
 router.use(settingRoutes);
 router.use(notificationRoutes);
+router.use(milestoneRoutes);
 
 module.exports = router;

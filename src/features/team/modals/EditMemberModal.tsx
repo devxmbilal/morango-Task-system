@@ -27,7 +27,6 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
 }) => {
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -42,7 +41,6 @@ const EditMemberModal: React.FC<EditMemberModalProps> = ({
     >
       <form
         onSubmit={onSubmit}
-        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '460px',

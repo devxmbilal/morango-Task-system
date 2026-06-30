@@ -161,6 +161,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     >
                       {item.title}
                     </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: '#7a7a86',
+                          background: '#f1f1f5',
+                          padding: '1px 7px',
+                          borderRadius: '5px',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {item.tag}
+                      </span>
+                    </div>
                     <div
                       className="overdue-ticket-mobile-meta"
                       style={{ display: 'none', fontSize: '10.5px', fontWeight: 700, color: '#dc2626', marginTop: '4px' }}

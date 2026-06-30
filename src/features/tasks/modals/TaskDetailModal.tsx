@@ -1,30 +1,51 @@
 import React from 'react';
-import type { Task, WorkspaceSettings } from '../../../types';
+import type { Milestone, Submission, Task, User, WorkspaceSettings } from '../../../types';
 import { getInitials, getPriorityMeta, getDaysLeft, formatDate } from '../../../lib/utils';
+import MilestonesSection from './MilestonesSection';
 
 interface TaskDetailModalProps {
   task: Task;
   members: any[];
+  user: User;
   settings: WorkspaceSettings;
   commentDraft: string;
+  milestones: Milestone[];
   onClose: () => void;
   onMoveTask: (id: string, status: string) => void;
   onSetProgress: (id: string, p: number) => void;
   onCommentChange: (v: string) => void;
   onPostComment: () => void;
+  onAddMilestone: () => void;
+  onEditMilestone: (m: Milestone) => void;
+  onDeleteMilestone: (m: Milestone) => void;
+  onSubmitWork: (m: Milestone) => void;
+  onEditSubmission: (s: Submission, m: Milestone) => void;
+  onReviewSubmission: (s: Submission, m: Milestone) => void;
+  onAcceptTask: (taskId: string) => void;
 }
 
 const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   task,
   members,
+  user,
   settings,
   commentDraft,
+  milestones,
   onClose,
   onMoveTask,
   onSetProgress,
   onCommentChange,
   onPostComment,
+  onAddMilestone,
+  onEditMilestone,
+  onDeleteMilestone,
+  onSubmitWork,
+  onEditSubmission,
+  onReviewSubmission,
+  onAcceptTask,
 }) => {
+  const isAssignee = user.id === task.assigneeId;
+  const needsAcceptance = isAssignee && !task.acceptedAt;
   const getUserById = (id: string) => members.find(m => m.id === id);
   const assigneeUser = getUserById(task.assigneeId);
   const taskPriorityMeta = getPriorityMeta(task.priority);
@@ -158,11 +179,39 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 fontWeight: 800,
                 lineHeight: 1.25,
                 letterSpacing: '-0.01em',
-                marginBottom: '18px',
+                marginBottom: '14px',
               }}
             >
               {task.title}
             </div>
+
+            {needsAcceptance && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe',
+                borderRadius: 10, marginBottom: 18,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>This task has been assigned to you</div>
+                  <div style={{ fontSize: 11.5, color: '#3b5fa3', marginTop: 2 }}>Accept to confirm you're starting work. The admin will be notified.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onAcceptTask(task.id)}
+                  style={{
+                    padding: '9px 18px', border: 'none', background: '#2563eb', color: '#fff',
+                    borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Accept Task
+                </button>
+              </div>
+            )}
+            {!needsAcceptance && task.acceptedAt && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#ecfdf5', color: '#059669', borderRadius: 6, fontSize: 11, fontWeight: 700, marginBottom: 16 }}>
+                ✓ Accepted by assignee
+              </div>
+            )}
 
             {/* Status Buttons */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
@@ -216,24 +265,39 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {task.desc}
             </div>
 
-            {/* Progress Slider */}
-            <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '10px' }}>
-              Progress — {task.progress}%
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={task.progress}
-              onChange={e => onSetProgress(task.id, parseInt(e.target.value, 10))}
-              style={{
-                width: '100%',
-                cursor: 'pointer',
-                accentColor: settings.accent,
-                marginBottom: '22px',
-              }}
-            />
+            {/* Progress (milestone-driven when milestones exist) */}
+            {(() => {
+              const hasMilestones = milestones.length > 0;
+              const approvedCount = milestones.filter(m => m.status === 'approved').length;
+              return (
+                <>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Progress — {task.progress}%</span>
+                    {hasMilestones && (
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#0891b2', background: '#ecfeff', padding: '2px 8px', borderRadius: 6 }}>
+                        {approvedCount}/{milestones.length} milestones approved
+                      </span>
+                    )}
+                  </div>
+                  {hasMilestones ? (
+                    <div style={{ height: 10, background: '#eef0f3', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                      <div style={{ height: '100%', width: `${task.progress}%`, background: settings.accent || '#4f46e5', borderRadius: 6, transition: 'width .3s ease' }} />
+                    </div>
+                  ) : (
+                    <input
+                      type="range" min="0" max="100" step="5" value={task.progress}
+                      onChange={e => onSetProgress(task.id, parseInt(e.target.value, 10))}
+                      style={{ width: '100%', cursor: 'pointer', accentColor: settings.accent, marginBottom: 8 }}
+                    />
+                  )}
+                  <div style={{ fontSize: 11, color: '#9a9aa4', marginBottom: 22 }}>
+                    {hasMilestones
+                      ? 'Progress updates automatically as milestones are approved.'
+                      : 'Drag to update progress manually.'}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Attachments */}
             {task.images.length > 0 && (
@@ -264,8 +328,22 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </>
             )}
 
+            {/* Milestones */}
+            <MilestonesSection
+              milestones={milestones}
+              user={user}
+              taskAssigneeId={task.assigneeId}
+              settings={settings}
+              onAddMilestone={onAddMilestone}
+              onEditMilestone={onEditMilestone}
+              onDeleteMilestone={onDeleteMilestone}
+              onSubmitWork={onSubmitWork}
+              onEditSubmission={onEditSubmission}
+              onReviewSubmission={onReviewSubmission}
+            />
+
             {/* Comments */}
-            <div style={{ borderTop: '1px solid #f2f2f5', paddingTop: '22px' }}>
+            <div style={{ borderTop: '1px solid #f2f2f5', paddingTop: '22px', marginTop: '22px' }}>
               <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#44444e', marginBottom: '12px' }}>
                 Comments ({task.comments.length})
               </div>

@@ -7,10 +7,32 @@ async function getNotifications(req, res) {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(notifications);
+    res.json(notifications.map(n => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      read: n.read,
+      taskId: n.taskId || null,
+      createdAt: n.createdAt
+    })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+}
+
+// PUT /notifications/:id/read  — mark single notification as read
+async function markOneRead(req, res) {
+  const id = parseInt(req.params.id, 10);
+  try {
+    await prisma.notification.updateMany({
+      where: { id, userId: req.user.id },
+      data: { read: true }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 }
 
@@ -30,5 +52,6 @@ async function markAllRead(req, res) {
 
 module.exports = {
   getNotifications,
-  markAllRead
+  markAllRead,
+  markOneRead
 };

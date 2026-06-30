@@ -121,6 +121,18 @@ export function useTasks() {
     }
   };
 
+  const acceptTask = async (taskId: string) => {
+    try {
+      await api.post(`/tasks/${taskId}/accept`);
+      fetchTasks();
+      toastSuccess('Task accepted — status moved to In Progress');
+      return { ok: true };
+    } catch (e: any) {
+      toastError(e.message || 'Failed to accept task');
+      return { ok: false };
+    }
+  };
+
   const postComment = async (taskId: string, text: string) => {
     try {
       await api.post(`/tasks/${taskId}/comments`, { text });
@@ -145,5 +157,6 @@ export function useTasks() {
     deleteTask,
     updateTask,
     postComment,
+    acceptTask,
   };
 }

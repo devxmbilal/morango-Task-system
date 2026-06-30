@@ -7,6 +7,7 @@ const { upload } = require('../middlewares/upload.middleware');
 router.get('/tasks', authenticateToken, taskController.getTasks);
 router.post('/tasks', authenticateToken, taskController.createTask);
 router.put('/tasks/:id', authenticateToken, taskController.updateTask);
+router.post('/tasks/:id/accept', authenticateToken, taskController.acceptTask);
 router.delete('/tasks/:id', authenticateToken, taskController.deleteTask);
 router.post('/tasks/:id/comments', authenticateToken, taskController.addComment);
 router.post('/upload', authenticateToken, upload.single('file'), taskController.uploadAttachment);

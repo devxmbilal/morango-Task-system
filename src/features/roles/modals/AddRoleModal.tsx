@@ -36,7 +36,6 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -51,7 +50,6 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({
     >
       <form
         onSubmit={onSubmit}
-        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '480px',
